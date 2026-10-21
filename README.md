@@ -8,4 +8,4 @@ The AGPL v3 license keeps all the major advantages of an open source project; it
 
 See the full license [here](LICENSE).
 
-**Status**: design complete.
+**Status**: Design in progress.
