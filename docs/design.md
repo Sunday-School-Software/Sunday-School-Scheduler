@@ -14,6 +14,7 @@
 |---|---|---|
 | 2026-10-16 | Hyrum Kammerman | First draft |
 | 2026-10-20 | Hyrum Kammerman | Linked the proposal. Replaced Teacher with Person (teachers and leaders) with an optional email field, so teachers who don't use the app can still be scheduled; leaders record their responses. Defined covered / tentative / uncovered. Decided that an email failure after a successful save only warns the teacher. Matched the notification goals to the proposal's 5 minutes. Added the Cognito and React decisions to §6. Dated the implementation plan and made milestone 4 a stretch goal. Reworded the messaging goal so automatic assignment emails meet it; broadcast messages are part of stretch milestone 4. |
+| 2026-10-20 | Hyrum Kammerman | Replaced the whiteboard photos with Mermaid diagrams that match the prose: the context diagram adds DynamoDB and drops the unexplained DNS Provider box, the component diagram adds the Cognito, DynamoDB and SES calls, the sequence diagram shows both failure cases with activation bars, and the data model diagram uses Person with plain lines and the roadmap Lesson note marked «roadmap» on a dashed line. |
 
 ---
 
@@ -43,7 +44,32 @@ The primary users are presidency members; teachers are secondary users. For this
 
 ## 3. System-context diagram
 
-![System-context diagram: SS Leader, SS Teacher and Admin interact with the Sunday School Scheduler, which uses an email service (SES) and an auth provider](images/system_context_diagram.jpeg)
+The system is the single box in the middle. Users are on the left; the AWS services it depends on are on the right.
+
+```mermaid
+flowchart LR
+    leader["Presidency member<br/>(leader)"]
+    teacher["Teacher"]
+    admin["Admin"]
+    app["Sunday School Scheduler"]
+    cognito["Amazon Cognito<br/>(auth provider)"]
+    ses["Amazon SES<br/>(email service)"]
+    db["Amazon DynamoDB<br/>(database)"]
+
+    leader -->|"edits classes and assignments,<br/>records responses for teachers without email"| app
+    teacher -->|"confirms or requests a substitute"| app
+    admin -->|"creates accounts and roles"| app
+    app -->|"auth requests"| cognito
+    cognito -->|"tokens, user IDs"| app
+    app -->|"people, roles, classes, assignments"| db
+    db -->|"query results"| app
+    app -->|"send-email requests"| ses
+    ses -->|"assignment emails"| teacher
+    ses -->|"response emails"| leader
+
+    classDef external stroke-dasharray: 5 5
+    class cognito,ses,db external
+```
 
 ## 4. Architecture and components
 
@@ -58,7 +84,30 @@ The UI and the four services are built and shipped together as one front-end bun
 | Email Service | Sends notification emails | SES | `email(address, message)` → error/OK |
 | DB (DynamoDB) | Persists people, roles, classes and assignments | User Service, Class Service | Item inserts, updates and queries; returns JSON |
 
-![Component diagram: UI, Auth Service, User Service, Class Service and Email Service inside a bundled boundary, with the DB outside](images/component_diagram.jpeg)
+```mermaid
+flowchart LR
+    subgraph bundle["Front-end bundle (built with Vite)"]
+        ui["UI<br/>handles user interaction"]
+        auth["Auth Service<br/>sends auth requests"]
+        user["User Service<br/>creates people, manages roles"]
+        cls["Class Service<br/>classes, assignments, responses"]
+        email["Email Service<br/>sends notification emails"]
+    end
+    cognito["Amazon Cognito"]
+    db[("DynamoDB")]
+    ses["Amazon SES"]
+
+    ui -->|"register(), login(), logout() → JWT"| auth
+    ui -->|"create() → error/OK"| user
+    ui -->|"assign(), update(class, teacher, status) → error/OK"| cls
+    ui -->|"email(address, message) → error/OK"| email
+    auth -->|"auth requests → tokens"| cognito
+    user -->|"item reads and writes → JSON"| db
+    cls -->|"inserts, updates, deletes → JSON"| db
+    email -->|"send requests → OK/error"| ses
+
+    style bundle stroke-dasharray: 5 5
+```
 
 ### Core flow, traced end to end
 
@@ -76,11 +125,61 @@ The UI and the four services are built and shipped together as one front-end bun
 
 A substitute request is the same flow with a different `status`.
 
-![Sequence diagram of the core flow and the failure case](images/sequence-diagram.jpeg)
+```mermaid
+---
+config:
+  sequence:
+    mirrorActors: false
+  themeCSS: "line[name='T'] { display: none; }"
+---
+sequenceDiagram
+    actor T as Teacher
+    participant UI
+    participant Auth as Auth Service
+    participant Cognito
+    participant Class as Class Service
+    participant DB as DynamoDB
+    participant Email as Email Service
+    participant SES
+
+    T->>+UI: types credentials
+    UI->>+Auth: login()
+    Auth->>+Cognito: check credentials
+    Cognito-->>-Auth: tokens
+    Auth-->>-UI: JWT
+    UI-->>-T: renders dashboard (next 4 Sundays)
+    T->>+UI: clicks Confirm
+    UI->>+Class: update(class, teacher, status)
+    Class->>DB: update(class, teacher, status)
+    alt DB write succeeds
+        activate DB
+        DB-->>-Class: OK
+        Class-->>-UI: OK
+        UI->>+Email: email(address, message)
+        Email->>+SES: send email to the presidency
+        alt email sent
+            SES-->>-Email: OK
+            Email-->>-UI: OK
+            UI-->>T: success message
+        else SES error
+            activate SES
+            activate Email
+            SES-->>-Email: error
+            Email-->>-UI: error
+            UI-->>T: warning that the presidency wasn't notified
+        end
+    else DB down
+        activate Class
+        Note over Class,DB: DB unreachable, update fails
+        Class-->>-UI: error
+        UI-->>T: error message, please try again
+    end
+    deactivate UI
+```
 
 ### The failure case
 
-**The database is down when the teacher clicks Confirm** (the red section at the bottom of the sequence diagram).
+**The database is down when the teacher clicks Confirm** (the "DB down" branch of the sequence diagram).
 
 1. Steps 1–5 proceed as above.
 2. Class Service → DB: `update(...)` fails. The DB is unreachable.
@@ -88,7 +187,7 @@ A substitute request is the same flow with a different `status`.
 4. The UI shows an error message ("Couldn't save your response, please try again") and does **not** call the Email Service. Because the update failed, nothing changed and nobody gets an email saying the lesson is confirmed.
 5. Recovery: the teacher retries. Saving the same status again leaves the same result, so a retry is safe.
 
-**The opposite partial failure: the DB write succeeds but the email fails.**
+**The opposite partial failure: the DB write succeeds but the email fails** (the "SES error" branch of the sequence diagram).
 
 1. Steps 1–7 proceed as above. The response is saved.
 2. UI → Email Service: `email(...)` returns an error from SES.
@@ -115,7 +214,45 @@ Assignment is the join between Person and Class. Each class on the schedule is s
 - **Tentative:** it has `num_teachers` assignments, but at least one is still pending.
 - **Uncovered:** it has fewer than `num_teachers` assignments, or any assignment has a substitute requested.
 
-![ERD: Role, Class, Teacher and Assignment, with foreign keys from Assignment to Teacher and Class](images/erd.jpeg)
+MVP relationships are solid lines. The roadmap Lesson note is labeled «roadmap» and joined by a dashed line.
+
+```mermaid
+classDiagram
+    direction LR
+    class Role {
+        user_id PK
+        role: admin, leader or teacher
+    }
+    class Person {
+        person_id PK
+        user_id, optional
+        name
+        email, optional
+    }
+    class Assignment {
+        person_id FK
+        class_id FK
+        status: pending, confirmed or substitute requested
+    }
+    class Class {
+        class_id PK
+        name
+        date
+        num_teachers
+    }
+    class LessonNote["Lesson note"] {
+        <<roadmap>>
+        class_id FK
+        author
+        content
+    }
+
+    Role -- Person : user_id
+    Person -- Assignment : person_id
+    Assignment -- Class : class_id
+    Class .. LessonNote : class_id (roadmap)
+
+```
 
 ## 6. Technology choices and alternatives considered
 
@@ -158,7 +295,7 @@ Assignment is the join between Person and Class. Each class on the schedule is s
 
 | Risk or question | Why it matters | Owner | How we'll find out, and by when |
 |---|---|---|---|
-| The boards put the services inside the browser bundle, but who enforces permissions? If the browser talks to DynamoDB and SES directly (with Cognito-issued AWS credentials), any signed-in teacher could edit any assignment unless IAM policies prevent it. | Security. Without a server-side check, the roles mean nothing. | Hyrum | Decide between browser-direct access with fine-grained IAM and a thin backend (e.g., Node running on an EC2 instance or home machine) before milestone 1 is built. Spike the IAM option during CP7. |
+| The design puts the services inside the browser bundle, but who enforces permissions? If the browser talks to DynamoDB and SES directly (with Cognito-issued AWS credentials), any signed-in teacher could edit any assignment unless IAM policies prevent it. | Security. Without a server-side check, the roles mean nothing. | Hyrum | Decide between browser-direct access with fine-grained IAM and a thin backend (e.g., Node running on an EC2 instance or home machine) before milestone 1 is built. Spike the IAM option during CP7. |
 | The DB write succeeds but the email fails. We chose to warn only (§4): no retry and no stored flag. | If the teacher ignores the warning, the presidency never hears about it, which breaks the 5-minute notification goal. | Hyrum | Test the warning by forcing an SES error during milestone 2. If the ward pilot shows missed notifications, add a retry or a "notification pending" flag. |
 | SES sandbox: new accounts can only send to verified addresses. | Real teachers wouldn't get email until AWS grants production access. | Hyrum | Request SES production access during milestone 2; it must be approved before the ward pilot. |
 | Two people act at once (two leaders assign the same class, or a leader reassigns while the teacher confirms). | Lost updates could show a class as covered when it isn't. | Hyrum | Use conditional writes in DynamoDB; test with two browsers during milestone 3. |
