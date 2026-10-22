@@ -4,8 +4,8 @@
 |---|---|
 | **Authors** | Hyrum Kammerman |
 | **Reviewers** | [who reviewed it — a teammate, the instructor, a design-review partner] |
-| **Status** | Draft |
-| **Last updated** | 2026-10-20 |
+| **Status** | In review |
+| **Last updated** | 2026-10-21 |
 | **Links** | [Proposal](https://docs.google.com/document/d/19jYz_kN3rfb-afqCQExlSvgMchcfi33fQDmuWVzpjow/edit?usp=sharing) · [Repository](https://github.com/Sunday-School-Software/Sunday-School-Scheduler) · [Issue tracker](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues) |
 
 ## Revision history
@@ -17,12 +17,13 @@ Details for each revision are in the commit messages (`git log docs/design.md`).
 | 2026-10-16 | Hyrum Kammerman | First draft |
 | 2026-10-20 | Hyrum Kammerman | Revised after draft review; Mermaid diagrams |
 | 2026-10-20 | Hyrum Kammerman | Moved the services to a Node backend on EC2; trimmed to length |
+| 2026-10-21 | Hyrum Kammerman | Trimmed a bit more and completed final proofread before submission. |
 
 ---
 
 ## 1. Context and scope
 
-Sunday School Scheduler is a web app that helps a Sunday School presidency in The Church of Jesus Christ of Latter-day Saints make sure every class on every Sunday has a teacher. Today my ward schedules teachers in a spreadsheet and confirms them by copying and pasting individual messages, which takes real effort and leads to last-minute substitutions. The app shows the presidency which lessons are covered, gives teachers a one-click way to confirm or ask for a substitute, and emails people when assignments are made or answered.
+Sunday School Scheduler is a web app that helps a Sunday School presidency in The Church of Jesus Christ of Latter-day Saints make sure every class on every Sunday has a teacher. Today my ward schedules teachers in a spreadsheet and confirms them by copying and pasting individual messages. The app shows the presidency which lessons are covered, gives teachers a frictionless way to confirm or ask for a substitute, and emails people when assignments are made or answered.
 
 ## 2. Goals and non-goals
 
@@ -53,7 +54,7 @@ flowchart LR
     ses["Amazon SES<br/>(email service)"]
     db["Amazon DynamoDB<br/>(database)"]
 
-    leader -->|"edits classes and assignments,<br/>records responses for teachers without email"| app
+    leader -->|"edits people, classes and assignments,<br/>records responses for teachers without email"| app
     app -->|"4-Sunday schedule:<br/>covered, tentative, uncovered"| leader
     teacher -->|"signs in, confirms<br/>or requests a substitute"| app
     app -->|"their assignments for<br/>the next 4 Sundays"| teacher
@@ -77,12 +78,12 @@ The UI runs in the browser. Everything else is one Node (TypeScript) process on 
 
 | Component | Responsibility | Talks to | Interface (rough) |
 |---|---|---|---|
-| UI | Sign-in, the teacher dashboard, the leader schedule, confirm/substitute actions, and success, warning and error messages. Holds the session JWT. | API | HTTPS JSON with the JWT, e.g. `POST /login`, `GET /assignments`, `PUT /assignments/{class}` |
-| API | The server's only entry point. Verifies the caller, checks their role, calls the services, and sends notifications after a successful write. | UI and the four services | HTTP routes returning JSON and status codes (200, 403, 503) |
+| UI | Sign-in, teacher dashboard, leader schedule, teacher actions, and messages. | API | HTTPS JSON with the JWT, e.g. `POST /login`, `GET /assignments`, `PUT /assignments/{class}` |
+| API | Verifies caller, checks their role, calls services, and sends notifications. | UI and the four services | HTTP routes returning JSON and status codes (200, 403, 500) |
 | Auth Service | Signs users up and in through Cognito and verifies JWTs | Cognito | `register()`, `login()`, `logout()` → JWT; `verify(jwt)` → user_id |
-| User Service | Creates people, links a new account to its Person, finds the caller, lists the leaders | DB | `create(name, email?)`, `linkAccount(user_id, email)`, `findByUser(user_id)` → Person, `listLeaders()` → emails |
-| Class Service | Classes, assignments and responses, using conditional writes so concurrent edits can't overwrite each other | DB | `createClass()`, `assign(class, person)`, `reassign(class, from, to)`, `listAssignments(person, dates)`, `listSchedule(dates)`, `update(class, person, status)` |
-| Email Service | Sends notification emails. Only the API calls it. | SES | `email(addresses, message)` → OK/error |
+| User Service | Creates people, links and finds accounts and roles| DB | `create(name, email?)`, `linkAccount(user_id, email)`, `findByUser(user_id)` → Person, `listLeaders()` → emails |
+| Class Service | Classes, assignments and responses | DB | `createClass()`, `assign(class, person)`, `reassign(class, from, to)`, `listAssignments(person, dates)`, `listSchedule(dates)`, `update(class, person, status)` |
+| Email Service | Sends notification emails. | SES | `email(addresses, message)` → OK/error |
 
 **Who can do what.** A teacher sees and responds to only their own assignments; anything else returns 403. A leader can also create classes and people, assign and reassign teachers, record responses for anyone, and see the full schedule. An admin manages accounts and roles (stretch milestone 6).
 
@@ -124,13 +125,13 @@ One EC2 instance, in the same AWS account as Cognito, DynamoDB and SES, runs Cad
 
 **A teacher confirms an assigned lesson.**
 
-1. The teacher signs in. UI → API `POST /login` → Auth Service `login()` → Cognito. The UI keeps the returned JWT. (The sequence diagram starts after this step.)
+1. The signed-in teacher opens the dashboard.
 2. UI → API `GET /assignments`. The API identifies the caller with `verify(jwt)` → user_id and `findByUser(user_id)` → Person and role.
 3. API → Class Service `listAssignments(person, next 4 Sundays)`. The UI renders the dashboard.
 4. The teacher clicks **Confirm**. UI → API `PUT /assignments/{class}`. The API identifies the caller again and checks that the assignment is theirs (or that they're a leader).
 5. API → Class Service `update(class, person, status)`, a conditional write that returns OK.
 6. API → User Service `listLeaders()`, then Email Service `email(addresses, message)` through SES.
-7. The API returns success and the UI shows a success message.
+7. The API returns success and the UI shows a success message. If SES fails after the save, the API still returns 200 and the UI warns that the presidency wasn't notified.
 
 A substitute request is the same flow with a different `status`.
 
@@ -209,8 +210,6 @@ sequenceDiagram
 
 **The database is down when the teacher clicks Confirm.** The conditional write fails, Class Service returns an error, and the API returns 503 without calling the Email Service. The UI says "Couldn't save your response, please try again." Nothing changed and nobody was emailed, and saving the same status again is safe, so recovery is simply retrying.
 
-**The write succeeds but the email fails.** SES returns an error, so the API returns success with a "not notified" flag. The UI warns: "Your response was saved, but we couldn't notify the presidency. Please let them know directly." The saved status already shows on the leader's schedule. The app doesn't retry (see §7).
-
 ## 5. Data model
 
 | Entity | Key fields | Relationships | Owned by | MVP or roadmap |
@@ -222,11 +221,13 @@ sequenceDiagram
 
 Cognito owns credentials and login emails. Person covers teachers and leaders, so presidency emails go to people whose role is leader, and a leader can still be assigned to teach. A Person can have no account and no email: leaders still assign them and record their responses after talking to them. When someone signs up, `linkAccount()` attaches the account to the Person with the same email, or creates a new teacher.
 
-A Class is one meeting on one date, so Gospel Doctrine on Nov 8 and on Nov 15 are two Class records. When a leader replaces a teacher, `reassign()` swaps the Assignment for a pending one in a single write, and the API emails both teachers (except anyone with no email).
-
 On the schedule, a class is **covered** when it has `num_teachers` assignments that are all confirmed, **tentative** when it has `num_teachers` assignments and at least one is pending, and **uncovered** otherwise (too few assignments, or a substitute requested).
 
 ```mermaid
+---
+config:
+  themeCSS: "g[id*=LessonNote] path { stroke-dasharray: 5 5; }"
+---
 classDiagram
     direction LR
     class Person {
@@ -298,7 +299,6 @@ classDiagram
 | Risk or question | Why it matters | Owner | How we'll find out, and by when |
 |---|---|---|---|
 | The single EC2 instance goes down during the pilot. | Nobody can sign in or respond on a Sunday morning. | Hyrum | Script the setup in CP7 so it can be rebuilt; deploy in milestone 1 so it runs for three weeks before the pilot. |
-| The write succeeds but the email fails, and we only warn (§4). | If the teacher ignores the warning, the presidency never hears. | Hyrum | Force an SES error in milestone 2. If the pilot shows missed notifications, add a retry. |
 | SES sandbox only sends to verified addresses. | Real teachers get no email until AWS grants production access. | Hyrum | Request production access in milestone 2; needed before the pilot. |
 | Two people edit the same class at once. | A lost update could show a class as covered when it isn't. | Hyrum | Conditional writes; test with two browsers in milestone 4. |
 | DynamoDB keys for relational data. | A poor key design makes the 4-Sunday view slow or awkward. | Hyrum | Write down the access patterns and prototype the tables in milestone 1. |
