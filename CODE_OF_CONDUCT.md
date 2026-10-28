@@ -49,6 +49,10 @@ When an incident does occur, it is important to report it promptly. To report a 
 
 Community Moderators take reports of violations seriously and will make every effort to respond in a timely manner. They will investigate all reports of code of conduct violations, reviewing messages, logs, and recordings, or interviewing witnesses and other participants. Community Moderators will keep investigation and enforcement actions as transparent as possible while prioritizing safety and confidentiality. In order to honor these values, enforcement actions are carried out in private with the involved parties, but communicating to the whole community may be part of a mutually agreed upon resolution.
 
+### Reporting the Maintainer
+
+If your report concerns the repository maintainer, you do not need to send it to the maintainer. Instead, report it directly to GitHub using the **Report content** option on the relevant comment, issue, or pull request, or through GitHub's [report abuse form](https://github.com/contact/report-abuse). See GitHub's guide to [reporting abuse or spam](https://docs.github.com/en/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam) for details.
+
 
 ## Addressing and Repairing Harm
 
