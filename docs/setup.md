@@ -1,0 +1,1 @@
+There's nothing to set up yet. The first working model is expected to involve setting up a local server and frontend based on a React frontend, Node backend, and some AWS resources to help with auth and data storage. If you want to get a head start, become familiar with React, Node, Caddy, Vite, AWS Cognito, and AWS DynamoDB.
