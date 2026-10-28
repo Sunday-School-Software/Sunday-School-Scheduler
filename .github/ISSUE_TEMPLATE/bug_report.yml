@@ -1,0 +1,135 @@
+name: Bug report
+description: Report something in Sunday School Scheduler that isn't working the way it should.
+labels: ["bug", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out each section so we can reproduce and fix it.
+
+        **Please don't include personal information** such as members' names, email addresses, or phone numbers. Use placeholders like "Teacher A" instead.
+
+        If you've found a security problem, don't open a public issue. Email the maintainer at sunday.school.software@gmail.com instead.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A short description of the bug.
+      placeholder: Confirming a lesson shows an error, but the lesson still shows as confirmed after a refresh.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: Your role
+      description: Which kind of account were you using when the bug happened?
+      options:
+        - Teacher
+        - Presidency member (leader)
+        - Admin
+        - Not signed in
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact steps that cause the bug, starting from opening the app.
+      placeholder: |
+        1. Sign in as a teacher
+        2. Open the dashboard
+        3. Click "Confirm" on the lesson for Nov 9
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+      placeholder: The lesson is marked as confirmed and a success message appears.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened? Include any error messages exactly as they appeared.
+      placeholder: An error message appeared saying "Something went wrong," but the lesson was confirmed anyway.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does this happen?
+      options:
+        - Every time
+        - Sometimes
+        - It only happened once
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: Include the version if you know it.
+      placeholder: e.g. Windows 11, macOS 15, iOS 18, Android 15
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: Include the version if you know it.
+      placeholder: e.g. Chrome 130, Safari 18, Firefox 132, Edge 130
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device type
+      options:
+        - Desktop or laptop
+        - Phone
+        - Tablet
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or recordings
+      description: If it helps, drag and drop images or videos here. Please hide any names or email addresses first.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output or logs
+      description: If you're comfortable opening the browser's developer console, paste any errors here. This will be formatted as code automatically.
+      render: shell
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else that might help, such as when it started happening or whether it works on another device.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the [existing issues](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues) and this bug hasn't been reported yet.
+          required: true
+        - label: I removed any personal information (names, email addresses, phone numbers) from this report.
+          required: true
+        - label: I agree to follow this project's [Code of Conduct](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/blob/main/CODE_OF_CONDUCT.md).
+          required: true
