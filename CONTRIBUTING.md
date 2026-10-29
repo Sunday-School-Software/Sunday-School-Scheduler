@@ -30,8 +30,6 @@ See the [Git Standards](docs/git-standards.md) for style and naming conventions.
 
 ## Expectations
 
-<!-- A short summary of the rules in the git standards that contributors most need to know, with a link to the full document. -->
-
 The full rules are in the [git standards](docs/git-standards.md). In short:
 
 - **Branch names:** a short, dash-separated description of the branch purpose.
