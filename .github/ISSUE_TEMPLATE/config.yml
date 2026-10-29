@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a Code of Conduct violation
+    url: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/blob/main/CODE_OF_CONDUCT.md#reporting-an-issue
+    about: Please don't open a public issue. Email the maintainer privately at sunday.school.software@gmail.com.
