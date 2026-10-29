@@ -7,6 +7,9 @@ The Sunday School Scheduler is a web app designed to help a Sunday School presid
 Nothing to run yet.
 See the [setup guide](setup.md) for more info.
 
+## Contributing
+Looking to become a contributor? See the [contributing guide](CONTRIBUTING.md) for guidance on where to start.
+
 ## License
 I chose the GNU Affero General Public License (AGPL) v3.0 for this project.
 
