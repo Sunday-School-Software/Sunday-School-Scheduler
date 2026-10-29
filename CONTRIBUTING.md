@@ -8,7 +8,7 @@ By participating in this project, you agree to follow the [Code of Conduct](CODE
 
 1. Read the [setup guide](docs/setup.md) to get the project running locally.
 2. Find an issue you want to work on. Ones labeled "good first issue" are a good place to start.
-3. Comment on the issue saying you'd like to take it, and wait for a maintainer to assign you.
+3. Comment on the issue saying you'd like to take it, and wait for a maintainer to assign you. See the [communication norms](docs/communication-norms.md) for communication rules and when to expect a reply.
 
 ## Reporting bugs and requesting features
 
