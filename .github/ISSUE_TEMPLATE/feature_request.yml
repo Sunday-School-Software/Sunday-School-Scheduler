@@ -1,0 +1,85 @@
+name: Feature request
+description: Suggest a new feature or an improvement to Sunday School Scheduler.
+labels: ["enhancement", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement! The most helpful requests describe the problem you're running into, not just the feature you'd like. That helps us find the best fix, even if it ends up looking different from what you pictured.
+
+        **Please don't include personal information** such as members' names, email addresses, or phone numbers. Use placeholders like "Teacher A" instead.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you having?
+      description: Describe what's hard, slow, or impossible to do today, and when it comes up.
+      placeholder: When a teacher asks for a substitute, I have to text several people one at a time to find someone who can cover the lesson.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: who
+    attributes:
+      label: Who has this problem?
+      description: Select everyone this affects.
+      multiple: true
+      options:
+        - Teachers
+        - Presidency members (leaders)
+        - Admins
+        - Class members or other ward members
+        - Everyone who uses the app
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What do you do about it now?
+      description: Describe your current workaround, even if it happens outside the app. If there's no workaround, say so.
+      placeholder: I keep a list of people who are willing to substitute in a notes app and message them by hand until someone says yes.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: How much does this affect you?
+      options:
+        - It stops me from doing something I need to do
+        - It's a regular annoyance or takes a lot of extra time
+        - It would be nice to have
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Ideas for a solution
+      description: If you have an idea for how the app could solve this, describe it here. Optional.
+      placeholder: A "Find a substitute" button that emails a list of willing substitutes and assigns the first person who accepts.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Other approaches you've considered
+      description: Any other solutions or tools you've tried or thought about, and why they didn't work as well.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else that might help, such as sketches, screenshots, or examples from other apps. Please hide any names or email addresses first.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the [existing issues](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues) and this feature hasn't been requested yet.
+          required: true
+        - label: I removed any personal information (names, email addresses, phone numbers) from this request.
+          required: true
+        - label: I agree to follow this project's [Code of Conduct](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/blob/main/CODE_OF_CONDUCT.md).
+          required: true
