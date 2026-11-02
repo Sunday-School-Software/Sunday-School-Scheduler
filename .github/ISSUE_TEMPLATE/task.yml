@@ -1,0 +1,45 @@
+name: Task
+description: Planned work, written so someone can pick it up and know when it's done.
+labels: ["needs triage", "task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for work that's already decided: a piece of a milestone, a chore, a doc to write. If you're reporting something broken or asking for something new, use the bug report or feature request form instead; a maintainer turns those into tasks when they're accepted.
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: One sentence. What's true for a user (or a contributor) when this is done?
+      placeholder: A teacher can confirm an assigned lesson from their dashboard.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Links, not a retelling. The [design document](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/blob/main/docs/design.md) section this comes from, the milestone it belongs to, and the request it answers, if there is one.
+      placeholder: |
+        Design §4, Core flow. Part of Milestone 1. Needs #NN first.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: A checklist a reviewer can mark true or false when the pull request is ready. Include the tests. Every change also meets our [definition of done](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/blob/main/docs/git-standards.md#definition-of-done); don't repeat it here.
+      placeholder: |
+        - [ ] Clicking "Confirm" on a lesson marks it as confirmed and shows a success message.
+        - [ ] The API returns 403 when a teacher tries to confirm someone else's lesson.
+        - [ ] Tests cover confirming your own lesson and trying to confirm another teacher's.
+    validations:
+      required: true
+
+  - type: textarea
+    id: start
+    attributes:
+      label: Where to start (optional)
+      description: For a newcomer. Which file, which function to imitate, which test to copy.
