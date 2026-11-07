@@ -5,7 +5,7 @@
 | **Authors** | Hyrum Kammerman |
 | **Reviewers** | [who reviewed it — a teammate, the instructor, a design-review partner] |
 | **Status** | In review |
-| **Last updated** | 2026-10-21 |
+| **Last updated** | 2026-11-06 |
 | **Links** | [Proposal](https://docs.google.com/document/d/19jYz_kN3rfb-afqCQExlSvgMchcfi33fQDmuWVzpjow/edit?usp=sharing) · [Repository](https://github.com/Sunday-School-Software/Sunday-School-Scheduler) · [Issue tracker](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues) |
 
 ## Revision history
@@ -18,6 +18,7 @@ Details for each revision are in the commit messages (`git log docs/design.md`).
 | 2026-10-20 | Hyrum Kammerman | Revised after draft review; Mermaid diagrams |
 | 2026-10-20 | Hyrum Kammerman | Moved the services to a Node backend on EC2; trimmed to length |
 | 2026-10-21 | Hyrum Kammerman | Trimmed a bit more and completed final proofread before submission. |
+| 2026-11-06 | Hyrum Kammerman | Matched the milestones to the repo's GitHub milestones; admin and broadcast moved beyond December |
 
 ---
 
@@ -58,7 +59,7 @@ flowchart LR
     app -->|"4-Sunday schedule:<br/>covered, tentative, uncovered"| leader
     teacher -->|"signs in, confirms<br/>or requests a substitute"| app
     app -->|"their assignments for<br/>the next 4 Sundays"| teacher
-    admin["Admin<br/>(stretch, milestone 6)"]
+    admin["Admin<br/>(beyond December)"]
     admin -.->|"creates accounts and roles"| app
     app -->|"auth requests"| cognito
     cognito -->|"tokens, user IDs"| app
@@ -85,7 +86,7 @@ The UI runs in the browser. Everything else is one Node (TypeScript) process on 
 | Class Service | Classes, assignments and responses | DB | `createClass()`, `assign(class, person)`, `reassign(class, from, to)`, `listAssignments(person, dates)`, `listSchedule(dates)`, `update(class, person, status)` |
 | Email Service | Sends notification emails. | SES | `email(addresses, message)` → OK/error |
 
-**Who can do what.** A teacher sees and responds to only their own assignments; anything else returns 403. A leader can also create classes and people, assign and reassign teachers, record responses for anyone, and see the full schedule. An admin manages accounts and roles (stretch milestone 6).
+**Who can do what.** A teacher sees and responds to only their own assignments; anything else returns 403. A leader can also create classes and people, assign and reassign teachers, record responses for anyone, and see the full schedule. An admin manages accounts and roles (beyond December; see §8).
 
 ```mermaid
 flowchart LR
@@ -292,31 +293,31 @@ classDiagram
 - **Alternative considered:** Our own auth: hashed passwords in DynamoDB and our own session tokens.
 - **Why the chosen option wins, given our goals:** The app stores ward members' contact details, so auth mistakes are the costliest kind, and a solo developer with 20–25 hours can't carefully build password storage, token expiry and reset flows. Cognito provides them within the free tier. The cost is lock-in to its flows and harder-to-debug configuration.
 - **Evidence:** None yet. The proposal budgets about 4 hours for database and Cognito setup.
-- **What would change our mind:** Setup runs well past that budget in milestone 1, or the verification step loses teachers who aren't comfortable with technology.
+- **What would change our mind:** Setup runs well past that budget in Milestone 1, or the verification step loses teachers who aren't comfortable with technology.
 
 ## 7. Risks and open questions
 
 | Risk or question | Why it matters | Owner | How we'll find out, and by when |
 |---|---|---|---|
-| The single EC2 instance goes down during the pilot. | Nobody can sign in or respond on a Sunday morning. | Hyrum | Script the setup in CP7 so it can be rebuilt; deploy in milestone 1 so it runs for three weeks before the pilot. |
-| SES sandbox only sends to verified addresses. | Real teachers get no email until AWS grants production access. | Hyrum | Request production access in milestone 2; needed before the pilot. |
-| Two people edit the same class at once. | A lost update could show a class as covered when it isn't. | Hyrum | Conditional writes; test with two browsers in milestone 4. |
-| DynamoDB keys for relational data. | A poor key design makes the 4-Sunday view slow or awkward. | Hyrum | Write down the access patterns and prototype the tables in milestone 1. |
+| The single EC2 instance goes down during the pilot. | Nobody can sign in or respond on a Sunday morning. | Hyrum | Script the setup in CP7 so it can be rebuilt; deploy early in Milestone 2, right after the Nov 18 demo, so the app runs on EC2 for at least a week before the Nov 29 pilot. |
+| SES sandbox only sends to verified addresses. | Real teachers get no email until AWS grants production access. | Hyrum | Request production access at the start of Milestone 2; it must be approved before the Nov 29 pilot. |
+| Two people edit the same class at once. | A lost update could show a class as covered when it isn't. | Hyrum | Not in a milestone: conditional writes are on the roadmap. The pilot has one leader editing, so the risk stays low until more leaders use the app. |
+| DynamoDB keys for relational data. | A poor key design makes the 4-Sunday view slow or awkward. | Hyrum | Write down the access patterns and create the tables in Milestone 1, by Nov 18. |
 | Collecting contact information ethically. | Church member data has usage policies. | Hyrum | Check Member Tools policies and include only people who agree, before the pilot. |
-| Will teachers use this rather than texts? | The value depends on teachers responding in the app. | Hyrum | Interview 1–2 other teachers before milestone 3. |
+| Will teachers use this rather than texts? | The value depends on teachers responding in the app. | Hyrum | Interview 1–2 other teachers by Nov 18, before Milestone 2 builds the leader schedule. |
 
 ## 8. Implementation plan
 
-The build window is Weeks 9–13 (Oct 26 – Nov 29), about 20–25 hours. Milestones 1–4 are the proposal's P0 deliverable; 1–5 come to about 22 hours. Milestone 6 is a P1 stretch goal.
+The live plan is the repo's [milestones page](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/milestones). If this table and the milestones page disagree, the milestones page is right.
+
+The build window runs from Oct 26 to the second pilot Sunday, Dec 6. The proposal budgeted about 20–25 hours; the current estimates are about 17.5–19 h for Milestone 1 and about 14 h for Milestone 2 plus deployment, which isn't sized yet. That is over budget, and Hyrum covers the overrun with free time (Milestone 1 on the milestones page has the capacity check). Milestones 0–2 are the proposal's P0 deliverable; admin and broadcast are a P1 goal for beyond December.
 
 | Milestone | What works when it's done | Depends on |
 |---|---|---|
-| 1 · Nov 8 · ~7 h | **Thinnest slice, deployed:** the app runs on EC2 behind Caddy. A teacher logs in, sees their hand-seeded assignments and confirms one; the API rejects changes to others' assignments; the UI shows success or the DB-down error. | — |
-| 2 · Nov 15 · ~3 h | **Notifications:** confirming or requesting a substitute emails the presidency, with the email-failed warning. SES production access requested. | 1 |
-| 3 · Nov 18 · ~6 h | **Leader schedule:** a leader creates classes, assigns and reassigns teachers (emailing them), and sees the next 4 Sundays marked covered, tentative or uncovered. | 1, 2 |
-| 4 · Nov 22 · ~4 h | **Teachers outside the app, safe concurrent edits:** leaders add people without accounts or email and record their responses; sign-up links to an existing Person; simultaneous edits can't overwrite each other. | 3 |
-| 5 · Nov 29 and Dec 6 · ~2 h | **Ward pilot:** SES production access approved; the ward uses the app for two Sundays (the proposal's success criterion). | 4 |
-| 6 · stretch · ~3–4 h | **Admin and broadcast:** an admin creates accounts and sets roles; a leader messages all teachers at once. | 2, 3 |
+| Milestone 0: Walking Skeleton · no due date · XS tasks | **Walking skeleton:** all the code needed to test, lint and run the project locally: the API and UI scaffolds, the test setup and the setup guide ([epic](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/22)). | — |
+| Milestone 1: Thinnest Slice · Nov 18 · ~17.5–19 h | **Nov 18 demo:** a teacher logs in, sees their hand-seeded assignments for the next 4 Sundays, confirms one, and sees it marked confirmed. It runs locally against the real Cognito pool and DynamoDB tables. The API rejects changes to others' assignments, and the UI shows the DB-down error. Epics: [Data in DynamoDB](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/27), [Sign-in with Cognito](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/28), [Teacher confirms a lesson](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/29). | 0 |
+| Milestone 2: MVP Complete · Dec 2 · ~14 h + deployment | **MVP:** the app is deployed on EC2 behind Caddy. Leaders build the 4-Sunday schedule and get an email for every teacher response, with the email-failed warning; teachers without accounts are covered; SES production access is approved; the ward runs the pilot on Nov 29 and Dec 6 (the proposal's success criterion). Epics: [Deploy to EC2 behind Caddy](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/30), [Leaders hear about every response](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/47), [Leaders build the schedule](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/48), [Teachers outside the app](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/49), [Ward pilot](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/50). | 1 |
+| Beyond December · ~3–4 h | **Admin and broadcast:** an admin creates accounts and sets roles; a leader messages all teachers at once. On the roadmap, with safe concurrent edits. | 2 |
 
 ---
 
