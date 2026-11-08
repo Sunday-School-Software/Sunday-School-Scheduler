@@ -21,7 +21,7 @@ Open an issue from the [new issue page](https://github.com/Sunday-School-Softwar
 
 ## Labels
 
-Besides GitHub's default labels (`bug`, `enhancement`, `question` and so on), we use these:
+We use GitHub's default labels (`bug`, `enhancement`, `question`, `good first issue`, and so on), plus these:
 
 | Label | What it means | Who adds it |
 |---|---|---|
@@ -53,13 +53,13 @@ The [project board](https://github.com/orgs/Sunday-School-Software/projects/2) s
 
 | Column | What it means | Who moves the card there |
 |---|---|---|
-| Backlog | Decided, but not ready to start. | New issues are added here automatically. |
+| Backlog | Not ready to start. | New issues are added here automatically. |
 | Ready | The acceptance criteria are written and nothing it depends on is unfinished. Anyone can pick it up. | A maintainer |
 | In Progress | Someone is working on it. | The person who took it |
 | In Review | A pull request is open and waiting for review. | The pull request author |
-| Done | The pull request is merged and the issue is closed. | GitHub, when the pull request merges |
+| Done | The pull request is merged and/or the issue is closed. | GitHub, when the pull request merges |
 
-When you start an issue, comment "I'm on this" and move its card to In Progress. When you open the pull request, write `Closes #N` in the description (where N is the issue number) and move the card to In Review. When the pull request merges, GitHub closes the issue and moves the card to Done. If you can't edit the board, a maintainer will move the card for you.
+When you start an issue, comment "I'm on this" and wait for a maintainer to assign you. When you're assigned, move its card to In Progress. When you open the pull request, write `Closes #N` in the description (where N is the issue number) and move the card to In Review (if it isn't moved there automatically). When the pull request merges, GitHub closes the issue and moves the card to Done. If you can't edit the board, a maintainer will move the card for you.
 
 ### Sizes
 
