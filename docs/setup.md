@@ -20,7 +20,7 @@ This guide takes you from a fresh clone to the app running on your machine. The 
 You need:
 
 - [Git](https://git-scm.com/downloads)
-- [Node.js](https://nodejs.org/) 20.19+, 22.13+, or 24+, which comes with npm. Run `node --version` to check.
+- [Node.js](https://nodejs.org/) 20.19+, 22.13+, or 24+, which comes with npm. Run `node --version` to check. Versions 21 and 23 are not supported.
 
 The sections written so far don't need an AWS account.
 
