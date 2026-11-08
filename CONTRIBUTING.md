@@ -36,7 +36,7 @@ The full rules are in the [git standards](docs/git-standards.md). In short:
 - **Commit messages:** always start with a capital letter.
 - **Pull requests:** include the issue addressed, the purpose of the change, and where a reviewer might start.
 - **Review:** required by someone other than the author before merge.
-- **Definition of done:** one logical changed, self-reviewed and reviewed by someone else, passing all tests and checks where applicable, and ready to be merged into main.
+- **Definition of done:** every change must meet the [definition of done](docs/git-standards.md#definition-of-done) before it's merged.
 
 ## Communication
 
