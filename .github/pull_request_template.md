@@ -22,4 +22,4 @@ See docs/git-standards.md for the full standards.
 - [ ] The branch name is lowercase words separated by dashes.
 - [ ] I reviewed my own changes before requesting review.
 - [ ] There are no merge conflicts with `main`.
-- [ ] This PR meets the [definition of done](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/blob/main/docs/git-standards.md#definition-of-done): tests, lint, and typecheck pass in each project touched (say which you ran), docs are updated or the PR says "no docs affected", and the linked issue's acceptance criteria are met.
+- [ ] This PR meets the [definition of done](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/blob/main/docs/git-standards.md#definition-of-done).

@@ -33,9 +33,10 @@ Purpose: to keep `main` clean and uncluttered while preserving history in other 
 
 Convention: a change is ready to merge into `main` only when every item below is true. Each item can be checked by looking at the PR. Not every change must start with an issue, but most of them should.
 
+**Scope:** the PR is one logical change, small enough to review in one sitting.
 - [ ] **Issue:** if there's a linked issue, the PR description says `Closes #N`.
 - [ ] **Acceptance criteria:** every acceptance criterion in the linked issue is met, or the PR says which ones aren't and why.
-- [ ] **Tests, lint, and types:** `npm test`, `npm run lint`, and `npm run typecheck` pass in each project the change touches (`api/`, `web/`, or both). Run them from inside that project's folder (see the [setup guide](setup.md)). There's no CI yet, so the author runs them and the PR says which ones were run. If the change touches neither project, the PR says so. If CI is added later, it runs these commands too.
+- [ ] **Tests, lint, and types:** `npm test`, `npm run lint`, and `npm run typecheck` pass in each project the change touches (`api/`, `web/`, or both). Run them from inside that project's folder (see the [setup guide](setup.md)). There's no CI yet, so the author runs them and the PR says which ones were run. If the change touches neither project, the PR says so.
 - [ ] **New tests:** new or changed behavior comes with tests that cover it.
 - [ ] **Docs:** each doc the change affects is updated in the same PR:
   - How to install, run, test, or configure anything: [`docs/setup.md`](setup.md).
@@ -47,12 +48,11 @@ Convention: a change is ready to merge into `main` only when every item below is
 - [ ] **Self-review:** the author reviewed their own changes before requesting review.
 - [ ] **Human review:** a human other than the author approved the PR (see [Review](#review)). The maintainer may skip this in rare emergencies. AI review is optional and doesn't replace human review.
 - [ ] **No conflicts:** the branch has no merge conflicts with `main`.
-- [ ] **Merge:** a maintainer squash-merges the PR (see [Merging](#merging)).
 
 Who confirms each item:
 
 - The author checks every item before requesting review, using the checklist in the PR template.
-- The reviewer confirms every item before approving.
+- The reviewer confirms every item before approving, including re-running tests.
 - The maintainer checks that every item is still true before squash-merging.
 
 Purpose: to give one list, in one place, that anyone can use to tell from the PR whether a change is done.
