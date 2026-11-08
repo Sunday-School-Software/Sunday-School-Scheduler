@@ -1,6 +1,39 @@
 # Setup guide
 
-The full guide is still in progress. The first working version will run a React frontend, a Node backend, and a few AWS resources for auth and data storage. To get a head start, get familiar with React, Node, Caddy, Vite, AWS Cognito, and AWS DynamoDB.
+This guide takes you from a fresh clone to the app running on your machine. The app is a React UI built with Vite and a Node API. In production, Caddy serves the UI and forwards `/api` requests to the API, and the API uses Amazon Cognito for sign-in and Amazon DynamoDB for data.
+
+## Sections
+
+1. [Before you start](#before-you-start)
+2. [Get the code](#get-the-code)
+3. [Run the API locally](#run-the-api-locally)
+4. [Run the UI locally](#run-the-ui-locally)
+5. [Run the tests](#run-the-tests)
+6. Set up AWS (not written yet):
+   - Create the Cognito user pool and app client, and where the IDs go ([#32](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/32))
+   - Create the DynamoDB tables, in AWS or in DynamoDB Local with `DYNAMODB_ENDPOINT` ([#33](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/33))
+   - Load the seed data, and which account to sign in with ([#34](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/34))
+7. Deploy (not written yet): ship the app to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
+
+## Before you start
+
+You need:
+
+- [Git](https://git-scm.com/downloads)
+- [Node.js](https://nodejs.org/) 20.19+, 22.13+, or 24+, which comes with npm. Run `node --version` to check.
+
+The sections written so far don't need an AWS account.
+
+## Get the code
+
+```sh
+git clone https://github.com/Sunday-School-Software/Sunday-School-Scheduler.git
+cd Sunday-School-Scheduler
+```
+
+If you plan to open a pull request, [fork the repository](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo) first and clone your fork instead (see [the pull request process](../CONTRIBUTING.md#the-pull-request-process)).
+
+The commands in each section below start from this folder, the root of the repository.
 
 ## Run the API locally
 
@@ -31,7 +64,7 @@ curl http://localhost:3000/api/health
 
 ## Run the UI locally
 
-You need the same Node.js version as the API. Start the API first, then in a second terminal:
+You need the same Node.js version as the API. Start the API first and leave it running. Then open a second terminal in the root of the repository and run:
 
 ```sh
 cd web
