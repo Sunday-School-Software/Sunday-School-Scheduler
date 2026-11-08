@@ -9,7 +9,7 @@ Each item is labeled:
 - **Planned:** we expect to build it.
 - **Idea:** a dream, not a commitment. It may never happen, and that's fine.
 
-Sections are in order (cut items first, then Next, then Later), and so are the items within each section.
+Sections are in order (cut items first, then Next, then Later), but the items in each section are not in any particular order.
 
 ## Cut from the MVP
 
@@ -21,13 +21,13 @@ Deployment moved from Milestone 1 to Milestone 2, but it's still part of the MVP
 
 - **What a user loses:** if two leaders edit the same class or assignment at the same time, the later save can overwrite the earlier one without either of them knowing. A lost update could show a class as covered when it isn't.
 - **Why it was cut:** time. The pilot has one leader editing, so it can wait. Cut from [#48](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/48); see the concurrent-edit risk in [design §7](design.md#7-risks-and-open-questions).
-- **What's already safe:** a teacher's own status change is a conditional write ([#38](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/38)). The open part is leader edits to classes and assignments.
+- **What's already planned:** a teacher's own status change is planned to be a conditional write ([#38](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/38)). The open part is leader edits to classes and assignments.
 - **What it needs first:** the leader edit routes from [#48](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/48).
 - **How to help:** open an issue to agree on the approach (for example, the same kind of conditional write #38 uses, plus a message when a leader's save loses), then build it once #48 is merged.
 
 ### 2. Time zones for "the next 4 Sundays" (Planned)
 
-- **What a user loses:** "the next 4 Sundays" is really today plus 28 days, using the server's date. Near midnight, a class can show up a day early or late. When today is a Sunday, the window can include a fifth Sunday.
+- **What a user loses:** "the next 4 Sundays" is really today plus 28 days, using the server's date. A class can show up a day early or late. When today is a Sunday, the window can include a fifth Sunday.
 - **Why it was cut:** time. Cut from [#37](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/37).
 - **What it needs first:** [#37](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/37) merged, and a decision on which time zone to use. #37 asks for the date math to live in its own function, so the fix should be small and easy to test.
 - **How to help:** once #37 is merged, open an issue proposing the time zone, then fix the date function and add tests for a Sunday and for late Saturday night.
@@ -81,7 +81,7 @@ Deployment moved from Milestone 1 to Milestone 2, but it's still part of the MVP
 
 ## Non-goals
 
-These are out of scope ([design §2](design.md#2-goals-and-non-goals)), so please don't propose features in these areas:
+These are out of scope ([design §2](design.md#2-goals-and-non-goals)). If you think one should change, see below.
 
 - Other organizations (Relief Society, Elders' Quorum, Primary). The data model is Sunday School–specific.
 - More than one ward. There's no multi-tenant separation.
