@@ -9,6 +9,7 @@ See the [setup guide](setup.md) for more info.
 
 ## Contributing
 Looking to become a contributor? See the [contributing guide](CONTRIBUTING.md) for guidance on where to start.
+The [project board](https://github.com/orgs/Sunday-School-Software/projects/2) shows what's being worked on now.
 
 ## License
 I chose the GNU Affero General Public License (AGPL) v3.0 for this project.
