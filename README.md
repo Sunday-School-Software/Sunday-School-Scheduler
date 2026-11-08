@@ -10,6 +10,9 @@ See the [setup guide](setup.md) for more info.
 ## Contributing
 Looking to become a contributor? See the [contributing guide](CONTRIBUTING.md) for guidance on where to start.
 
+## Roadmap
+See the [roadmap](docs/roadmap.md) for what comes after the December MVP, what was cut from it, and where you can help.
+
 ## License
 I chose the GNU Affero General Public License (AGPL) v3.0 for this project.
 

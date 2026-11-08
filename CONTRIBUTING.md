@@ -42,6 +42,10 @@ The full rules are in the [git standards](docs/git-standards.md). In short:
 
 For communication standards, see the [communication norms](docs/communication-norms.md).
 
+## Where the project is going
+
+The [roadmap](docs/roadmap.md) lists what comes after the December MVP, what was cut from it, and the project's non-goals. If you want to make a bigger contribution, start from the roadmap, then open an issue to agree on the approach before you write code.
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the project's [AGPL v3.0 license](LICENSE).
