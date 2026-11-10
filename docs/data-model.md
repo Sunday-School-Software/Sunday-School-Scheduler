@@ -77,7 +77,7 @@ Every read and write the app makes in Milestones 1 and 2. None of them scans the
 | 1 | The Person for the signed-in user, on every request | User `findByUser(user_id)` | 1 ([#36]) | Query `ByUser`: `user_id = :sub` |
 | 2 | A teacher's assignments for the next 4 Sundays | Class `listAssignments(person, dates)` | 1 ([#37]) | Query `GSI1`: `gsi1pk = PERSON#<person_id>` and `gsi1sk BETWEEN :from AND :to` (see [Date windows](#date-windows)) |
 | 3 | A teacher confirms or requests a substitute | Class `update(class, person, status)` | 1 ([#38]) | UpdateItem on the assignment's key, with a condition (see [The conditional write](#the-conditional-write)) |
-| 4 | Seed teachers, classes and assignments | seed script | 1 ([#34]) | PutItem. A Put replaces the whole item, so running the script again resets every seeded assignment to `pending` |
+| 4 | Seed teachers, classes and assignments | seed script | 1 ([#34]) | PutItem. A Put replaces the whole item, so running the script again resets every seeded assignment to `pending`. The script uses hard-coded keys rather than UUIDs to make this reset possible. |
 | 5 | Every class and assignment for the next 4 Sundays | Class `listSchedule(dates)` | 2 ([#48]) | Query `GSI2`: `gsi2pk = SCHEDULE` and `gsi2sk BETWEEN :from AND :to`. Class Service works out covered, tentative and uncovered from the results |
 | 6 | One class with everyone assigned to it | Class Service | 2 ([#48]) | Query: `pk = CLASS#<class_id>` |
 | 7 | Everyone, to pick a teacher to assign | User Service | 2 ([#48]) | Query `GSI1`: `gsi1pk = PEOPLE` |
