@@ -19,6 +19,7 @@ Details for each revision are in the commit messages (`git log docs/design.md`).
 | 2026-10-20 | Hyrum Kammerman | Moved the services to a Node backend on EC2; trimmed to length |
 | 2026-10-21 | Hyrum Kammerman | Trimmed a bit more and completed final proofread before submission. |
 | 2026-11-06 | Hyrum Kammerman | Matched the milestones to the repo's GitHub milestones; admin and broadcast moved beyond December |
+| 2026-11-09 | Hyrum Kammerman | Linked the DynamoDB key design ([data-model.md](data-model.md)) from §5, §6 and §7 |
 
 ---
 
@@ -224,6 +225,8 @@ Cognito owns credentials and login emails. Person covers teachers and leaders, s
 
 On the schedule, a class is **covered** when it has `num_teachers` assignments that are all confirmed, **tentative** when it has `num_teachers` assignments and at least one is pending, and **uncovered** otherwise (too few assignments, or a substitute requested).
 
+All three entities live in one DynamoDB table. [data-model.md](data-model.md) gives its keys and indexes and the query behind every access pattern. To keep each screen to one query, an Assignment also stores copies of its class's name and date and its person's name; whatever changes the original updates the copies too.
+
 ```mermaid
 ---
 config:
@@ -284,7 +287,7 @@ classDiagram
 - **Chosen:** Amazon DynamoDB.
 - **Alternative considered:** PostgreSQL on the EC2 instance.
 - **Why the chosen option wins, given our goals:** DynamoDB has no database to back up or upgrade, it keeps the EC2 instance stateless and rebuildable, and our volume (a few dozen people, a few hundred assignments a year) fits the free tier. PostgreSQL would tie the data to one machine and put backups on a solo developer. The cost is that our model is relational: instead of SQL joins, we design keys around our access patterns ("a teacher's assignments", "the next 4 Sundays") and enforce relationships in the services.
-- **Evidence:** None yet for DynamoDB; the spike confirmed AWS access from this account.
+- **Evidence:** The spike confirmed AWS access from this account. The key design in [data-model.md](data-model.md) serves every Milestone 1 and 2 access pattern with a Query or a single-item read or write, without a table scan; tables built from it come in Milestone 1.
 - **What would change our mind:** The access patterns need joins or ad-hoc queries that don't fit the key design, or roadmap features make the model much more relational.
 
 ### Decision: use Amazon Cognito for sign-in
@@ -302,7 +305,7 @@ classDiagram
 | The single EC2 instance goes down during the pilot. | Nobody can sign in or respond on a Sunday morning. | Hyrum | Script the setup as part of deployment so the instance can be rebuilt; deploy by Nov 22, right after the Nov 18 demo, so the app runs on EC2 for a week before the Nov 29 pilot. |
 | SES sandbox only sends to verified addresses. | Real teachers get no email until AWS grants production access. | Hyrum | Request production access by Nov 18 (it needs no code), so there is time to resubmit if it is denied before the Nov 29 pilot. |
 | Two people edit the same class at once. | A lost update could show a class as covered when it isn't. | Hyrum | Teachers' own responses use conditional writes in Milestone 1. Safe leader edits to classes and assignments are on the roadmap; the pilot has one leader editing, so watch for lost updates during the pilot. |
-| DynamoDB keys for relational data. | A poor key design makes the 4-Sunday view slow or awkward. | Hyrum | Write down the access patterns and create the tables in Milestone 1, by Nov 18. |
+| DynamoDB keys for relational data. | A poor key design makes the 4-Sunday view slow or awkward. | Hyrum | Write down the access patterns ([data-model.md](data-model.md)) and create the tables in Milestone 1, by Nov 18. |
 | Collecting contact information ethically. | Church member data has usage policies. | Hyrum | Check Member Tools policies and include only people who agree, before the pilot. |
 | Will teachers use this rather than texts? | The value depends on teachers responding in the app. | Hyrum | Interview 1–2 other teachers by Nov 18. |
 
