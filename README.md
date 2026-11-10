@@ -1,7 +1,7 @@
 # Sunday-School-Scheduler
 The Sunday School Scheduler is a web app designed to help a Sunday School presidency coordinate Teacher schedules quickly and efficiently so that every lesson is covered.
 
-**Status**: Milestone 1 is in progress (see the [milestones](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/milestones)).
+**Status**: Milestone 1 is in progress (see the [milestones](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/milestones) and the [MVP plan](docs/mvp-plan.md)). See [known issues](docs/known-issues.md) for what doesn't work yet.
 
 ## Quickstart
 You need Git and Node.js 20.19+, 22.13+, or 24+. Versions 21 and 23 are not supported. Start the API:
