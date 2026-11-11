@@ -17,7 +17,7 @@ DynamoDB has no joins, so the keys are designed around the questions the app ask
 
 ## One table
 
-The app keeps people, classes and assignments in **one table**, the single-table design AWS recommends for DynamoDB. The table's name comes from an environment variable, so development and production use separate tables ([#33]).
+The app keeps people, classes and assignments in **one table**, the single-table design AWS recommends for DynamoDB. The table's name comes from the `DYNAMODB_TABLE` environment variable, so development and production use separate tables. `npm run db:create` in `api/` creates the table with the keys and indexes below ([setup guide](setup.md#create-the-dynamodb-table)).
 
 We chose one table over three (People, Classes, Assignments) because:
 
