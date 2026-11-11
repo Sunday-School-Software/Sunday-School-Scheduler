@@ -23,7 +23,7 @@ These are temporary on purpose. Don't build on them as if they were the real thi
 ### "The next 4 Sundays" is a 28-day window on the server's date
 
 - **What happens:** the dashboard shows assignments from today through 28 days from today, using the server's clock. Near midnight, a class can show up a day early or late, and the window can include a fifth Sunday.
-- **When it bites:** near midnight, and in months where 28 days span five Sundays.
+- **When it bites:** near midnight, and whenever today is a Sunday (the window then includes today's Sunday plus the next four).
 - **Workaround:** none needed for the demo or the pilot.
 - **Tracked in:** [#37], with time zones on the [roadmap](roadmap.md).
 
