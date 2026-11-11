@@ -11,7 +11,7 @@
 
 ## 2. What's deferred
 
-- **The cut: deployment** ([#30]): it proves none of the claims below. **Milestone 2:** SES notifications ([#47]), leaders build the schedule ([#48]), teachers without accounts ([#49]), the pilot ([#50]). Later: [roadmap.md](roadmap.md).
+- **The cut: deployment** ([#30]): it proves none of the claims below. **Milestone 2:** SES notifications ([#47]), sign-up ([#69]), leaders build the schedule ([#48]), teachers without accounts ([#49]), the pilot ([#50]). Later: [roadmap.md](roadmap.md).
 - **Throwaway corners** ([known-issues.md](known-issues.md)): seeded fake data and accounts; no notification on a response; "next 4 Sundays" = 28 days on the server's date; one generic error.
 
 ## 3. What risk it addresses
@@ -56,3 +56,4 @@
 [#49]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/49
 [#50]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/50
 [#65]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/65
+[#69]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/69
