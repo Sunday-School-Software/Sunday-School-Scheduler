@@ -8,6 +8,7 @@
 
 - **The cut: deployment** ([#30]); it proves no claim below. **Also Milestone 2:** sign-up ([#69]), leader emails ([#47]), scheduling ([#48]), no-account teachers ([#49]), the pilot ([#50]). **Later:** [roadmap](roadmap.md).
 - **Throwaway corners** ([known issues](known-issues.md)): seeded fake data and accounts; no response emails; "next 4 Sundays" = 28 days on the server's date; one generic error.
+- **Emergency cut: sign-in with Cognito** ([#28]). It doesn't fit the claims as strongly as the other epics and can move to M2 if time is running low.
 
 ### 3. What risk it addresses
 
