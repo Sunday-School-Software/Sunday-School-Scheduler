@@ -21,6 +21,7 @@ You need:
 
 - [Git](https://git-scm.com/downloads)
 - [Node.js](https://nodejs.org/) 20.19+, 22.13+, or 24+, which comes with npm. Run `node --version` to check. Versions 21 and 23 are not supported.
+- [curl](https://curl.se/download.html), used below to check that the API is running. It comes preinstalled on macOS and most Linux distributions, and with Windows 10 and later.
 
 The sections written so far don't need an AWS account. To run the database on your machine instead of in AWS, you also need [Docker](https://docs.docker.com/get-started/get-docker/).
 
