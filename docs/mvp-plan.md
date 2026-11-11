@@ -23,8 +23,8 @@
 **Falsifier:** if the teacher can't finish alone in a minute or would rather text, sign-in is the wrong front door, and Milestone 2 moves email-link answers ahead of leader features.
 
 **Script:**
-1. Claim: a teacher answers in under a minute; here's what a real teacher did and said.
-2. Sign in, confirm one lesson, ask for a sub on another, refresh, show the DynamoDB row.
+1. Claim: a teacher answers in under a minute; here's what a real teacher did and said. Include their thoughts about actually using the app.
+2. Sign in, confirm one lesson, ask for a sub on another, refresh, show the DynamoDB row and the cost in Cost Explorer.
 3. Run the 403 and DB-down tests. Honest edge: nobody is notified yet (Milestone 2).
 
 **Fallback:** re-seed data, sign in early, phone hotspot for AWS; declared last resort: a rehearsal clip.
