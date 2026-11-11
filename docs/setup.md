@@ -64,6 +64,8 @@ You need Node.js 20.19+, 22.13+, or 24+. The tools these projects use (ESLint, J
    # {"status":"ok"}
    ```
 
+   **Checkpoint:** the command prints `{"status":"ok"}`. If curl reports that it could not connect, the API is not running yet — give `npm run dev` a moment, and see [When things go wrong](#when-things-go-wrong) if it keeps failing.
+
 | Command | What it does |
 |---|---|
 | `npm run dev` | Runs the server from source and restarts it when a file changes |
@@ -96,6 +98,8 @@ You need the same Node.js version as the API.
 
 4. Open http://localhost:5173. The page calls `GET /api/health` and shows the result, so you'll see the API's `{"status":"ok"}` response when the API is running and an error when it isn't.
 
+   **Checkpoint:** the page shows `{"status":"ok"}`. If it shows an error instead, the API is not reachable — check it is still running in its terminal (step 1), and see [When things go wrong](#when-things-go-wrong).
+
 The dev server forwards every `/api` request to the API at http://localhost:3000, the same way Caddy does in production, so the UI uses the same `/api` paths in both. If the API runs somewhere else, set `API_URL` when you start the UI (for example `API_URL=http://localhost:4000 npm run dev`).
 
 | Command | What it does |
@@ -120,6 +124,8 @@ Each project has its own tests, run with [Jest](https://jestjs.io/):
    ```
 
 The tests don't need the API running, an AWS account, or network access. `npm test` exits with a non-zero code if any test fails.
+
+**Checkpoint:** both suites report that every test passed. A failure on a fresh clone, before you have changed anything, is worth reporting — see [When things go wrong](#when-things-go-wrong).
 
 Put a test next to the file it tests and name it `<file>.test.ts` (or `.test.tsx` in `web/`). To write a new one, copy an example:
 
