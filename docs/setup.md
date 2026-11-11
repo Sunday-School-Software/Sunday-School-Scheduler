@@ -14,6 +14,7 @@ This guide takes you from a fresh clone to the app running on your machine. The 
    - Create the Cognito user pool and app client, and where the IDs go ([#32](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/32))
    - Load the seed data, and which account to sign in with ([#34](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/34))
 8. Deploy (not written yet): ship the app to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
+9. [When things go wrong](#when-things-go-wrong)
 
 ## Before you start
 
@@ -175,3 +176,12 @@ DYNAMODB_TABLE=sunday-school-dev npm run db:create
 ```
 
 Use a name that says which environment the table is for, such as `sunday-school-dev` for development and `sunday-school-prod` for production. The table uses on-demand billing, so an idle development table costs nothing (see [Billing](data-model.md#billing)).
+
+## When things go wrong
+
+- **`node --version` prints 21, 23, or something older than 20.** The tools these projects use (ESLint, Jest and Vite) don't support those versions. Install Node.js 20.19+, 22.13+, or 24+ and try again.
+- **`npm install` fails.** Check you are in the right folder — the API and the UI each have their own `package.json`, so install from `api/` for the API and from `web/` for the UI — and that `node --version` shows a supported version (see above).
+- **The API stops with `EADDRINUSE` (address already in use) for port 3000.** Something is already listening on that port, often the API itself in another terminal. Stop that process, or run the API on another port with `PORT`, for example `PORT=4000 npm run dev`. If you change the API's port, start the UI with the matching `API_URL` (for example `API_URL=http://localhost:4000 npm run dev`) so it forwards `/api` to the right place.
+- **The curl checkpoint cannot connect (`Failed to connect`).** The API is not running. Look at the terminal where you ran `npm run dev` for the error it stopped on; if there is none, give it a few seconds to start and try the check again.
+- **The UI loads but shows an error instead of `{"status":"ok"}`.** The page reached the UI dev server but not the API. Make sure the API is running (its checkpoint above) and, if you moved it to another port, that the UI was started with the matching `API_URL`.
+- **`npm start` or `npm run preview` cannot find `dist/`.** Both run the compiled build. Run `npm run build` in the same project first.
