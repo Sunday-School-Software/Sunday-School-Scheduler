@@ -27,12 +27,14 @@ The sections written so far don't need an AWS account. To run the database on yo
 
 ## Get the code
 
-```sh
-git clone https://github.com/Sunday-School-Software/Sunday-School-Scheduler.git
-cd Sunday-School-Scheduler
-```
+1. Clone the repository and move into it:
 
-If you plan to open a pull request, [fork the repository](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo) first and clone your fork instead (see [the pull request process](../CONTRIBUTING.md#the-pull-request-process)).
+   ```sh
+   git clone https://github.com/Sunday-School-Software/Sunday-School-Scheduler.git
+   cd Sunday-School-Scheduler
+   ```
+
+   If you plan to open a pull request, [fork the repository](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo) first and clone your fork instead (see [the pull request process](../CONTRIBUTING.md#the-pull-request-process)).
 
 The commands in each section below start from this folder, the root of the repository.
 
@@ -40,18 +42,27 @@ The commands in each section below start from this folder, the root of the repos
 
 You need Node.js 20.19+, 22.13+, or 24+. The tools these projects use (ESLint, Jest and Vite) don't support the versions in between.
 
-```sh
-cd api
-npm install
-npm run dev
-```
+1. Move into the API folder and install its dependencies:
 
-The API listens on http://localhost:3000 (set `PORT` to change it). Check that it's up:
+   ```sh
+   cd api
+   npm install
+   ```
 
-```sh
-curl http://localhost:3000/api/health
-# {"status":"ok"}
-```
+2. Start the API:
+
+   ```sh
+   npm run dev
+   ```
+
+   The API listens on http://localhost:3000 (set `PORT` to change it). Leave it running while you work through the rest of this guide.
+
+3. Check that it's up:
+
+   ```sh
+   curl http://localhost:3000/api/health
+   # {"status":"ok"}
+   ```
 
 | Command | What it does |
 |---|---|
@@ -66,15 +77,24 @@ curl http://localhost:3000/api/health
 
 ## Run the UI locally
 
-You need the same Node.js version as the API. Start the API first and leave it running. Then open a second terminal in the root of the repository and run:
+You need the same Node.js version as the API.
 
-```sh
-cd web
-npm install
-npm run dev
-```
+1. Start the API first (see the previous section) and leave it running.
 
-Open http://localhost:5173. The page calls `GET /api/health` and shows the result, so you'll see the API's `{"status":"ok"}` response when the API is running and an error when it isn't.
+2. Open a second terminal in the root of the repository, move into the UI folder and install its dependencies:
+
+   ```sh
+   cd web
+   npm install
+   ```
+
+3. Start the UI:
+
+   ```sh
+   npm run dev
+   ```
+
+4. Open http://localhost:5173. The page calls `GET /api/health` and shows the result, so you'll see the API's `{"status":"ok"}` response when the API is running and an error when it isn't.
 
 The dev server forwards every `/api` request to the API at http://localhost:3000, the same way Caddy does in production, so the UI uses the same `/api` paths in both. If the API runs somewhere else, set `API_URL` when you start the UI (for example `API_URL=http://localhost:4000 npm run dev`).
 
@@ -92,10 +112,12 @@ The dev server forwards every `/api` request to the API at http://localhost:3000
 
 Each project has its own tests, run with [Jest](https://jestjs.io/):
 
-```sh
-(cd api && npm test)
-(cd web && npm test)
-```
+1. Run the API tests and the UI tests, one line each:
+
+   ```sh
+   (cd api && npm test)
+   (cd web && npm test)
+   ```
 
 The tests don't need the API running, an AWS account, or network access. `npm test` exits with a non-zero code if any test fails.
 
