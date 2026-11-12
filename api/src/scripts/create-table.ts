@@ -1,7 +1,9 @@
 // Creates the app's DynamoDB table. Run with `npm run db:create`; see docs/setup.md.
 import { createDynamoClient, errorMessage, tableNameFrom } from "../db/client.js";
 import { ensureTable } from "../db/table.js";
+import { loadEnvFile } from "../env.js";
 
+loadEnvFile();
 const client = createDynamoClient();
 try {
   const tableName = tableNameFrom();

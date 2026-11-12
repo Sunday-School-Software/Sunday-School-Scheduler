@@ -1,5 +1,7 @@
 import { createApp } from "./app.js";
+import { loadEnvFile } from "./env.js";
 
+loadEnvFile();
 const port = Number(process.env.PORT ?? 3000);
 
 createApp().listen(port, () => {
