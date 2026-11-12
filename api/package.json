@@ -17,9 +17,11 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "db:create": "tsx src/scripts/create-table.ts"
+    "db:create": "tsx src/scripts/create-table.ts",
+    "cognito:create": "tsx src/scripts/create-user-pool.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1167.0",
     "@aws-sdk/client-dynamodb": "^3.1166.0",
     "express": "^5.3.0"
   },

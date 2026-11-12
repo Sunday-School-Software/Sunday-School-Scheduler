@@ -15,7 +15,7 @@ Sections are in order (cut items first, then Next, then Later), but the items in
 
 These were cut to fit the MVP into the time we had. The pilot will run without them.
 
-Deployment moved from Milestone 1 to Milestone 2, but it's still part of the MVP, so it isn't listed here. The same goes for the Cognito setup script ([#32](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/32)), which moves to Milestone 2 if Milestone 1 falls behind.
+Deployment moved from Milestone 1 to Milestone 2, but it's still part of the MVP, so it isn't listed here.
 
 ### 1. Safe concurrent edits for leaders (Planned)
 

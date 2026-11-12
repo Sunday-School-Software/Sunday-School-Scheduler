@@ -10,10 +10,9 @@ This guide takes you from a fresh clone to the app running on your machine. The 
 4. [Run the UI locally](#run-the-ui-locally)
 5. [Run the tests](#run-the-tests)
 6. [Create the DynamoDB table](#create-the-dynamodb-table), in DynamoDB Local or in AWS
-7. Set up the rest of AWS (not written yet):
-   - Create the Cognito user pool and app client, and where the IDs go ([#32](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/32))
-   - Load the seed data, and which account to sign in with ([#34](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/34))
-8. Deploy (not written yet): ship the app to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
+7. [Create the Cognito user pool](#create-the-cognito-user-pool), in cognito-local or in AWS, and where the IDs go
+8. Load the seed data, and which account to sign in with (not written yet, [#34](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/34))
+9. Deploy (not written yet): ship the app to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
 
 ## Before you start
 
@@ -22,7 +21,7 @@ You need:
 - [Git](https://git-scm.com/downloads)
 - [Node.js](https://nodejs.org/) 20.19+, 22.13+, or 24+, which comes with npm. Run `node --version` to check. Versions 21 and 23 are not supported.
 
-The sections written so far don't need an AWS account. To run the database on your machine instead of in AWS, you also need [Docker](https://docs.docker.com/get-started/get-docker/).
+The sections written so far don't need an AWS account. To run the database and sign-in on your machine instead of in AWS, you also need [Docker](https://docs.docker.com/get-started/get-docker/).
 
 ## Get the code
 
@@ -62,6 +61,9 @@ curl http://localhost:3000/api/health
 | `npm run lint` | Checks the code with ESLint |
 | `npm run lint:fix` | Fixes the ESLint problems it can fix automatically |
 | `npm run db:create` | Creates the DynamoDB table (see [Create the DynamoDB table](#create-the-dynamodb-table)) |
+| `npm run cognito:create` | Creates the Cognito user pool and app client (see [Create the Cognito user pool](#create-the-cognito-user-pool)) |
+
+The API and these commands read their settings from environment variables. To avoid typing them each time, copy `api/.env.example` to `api/.env` and fill it in (see [Where the IDs go](#where-the-ids-go)). A variable set in your shell overrides the file. Git ignores `.env`, so your settings stay out of commits.
 
 ## Run the UI locally
 
@@ -146,3 +148,97 @@ DYNAMODB_TABLE=sunday-school-dev npm run db:create
 ```
 
 Use a name that says which environment the table is for, such as `sunday-school-dev` for development and `sunday-school-prod` for production. The table uses on-demand billing, so an idle development table costs nothing (see [Billing](data-model.md#billing)).
+
+## Create the Cognito user pool
+
+The app signs people in with an [Amazon Cognito](https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools.html) user pool (see [the design](design.md#decision-use-amazon-cognito-for-sign-in)). `npm run cognito:create` creates the pool and the API's app client:
+
+- The pool signs people in with their email address, in any letter case, and sends a code to the email to verify it when they sign up. It has deletion protection on, so it can't be deleted by accident.
+- The app client, `sunday-school-api`, has no client secret and allows `USER_PASSWORD_AUTH`, because the API sends the email and password to Cognito for `login()`.
+
+The command reads these environment variables:
+
+| Variable | What it's for |
+|---|---|
+| `COGNITO_USER_POOL_NAME` | The pool's name. Required, with no default, so development and production always use separate pools. |
+| `COGNITO_ENDPOINT` | Where Cognito is. Set it to use cognito-local; leave it unset to use AWS. |
+
+Running the command again is safe. It finds the pool by name, and if the pool and app client already exist with the right settings it says so, changes nothing, and prints their IDs again. If it finds a pool whose sign-in settings are wrong, it explains what's wrong, exits with an error and leaves the pool alone. Cognito can't change those settings on an existing pool, so the fix is a new pool with a different name. Cognito allows two pools with the same name, so if there are two, the command lists both and stops instead of guessing which one you meant.
+
+### Development and production pools
+
+Each environment gets its own pool, chosen by `COGNITO_USER_POOL_NAME`:
+
+| Environment | Pool name | Where |
+|---|---|---|
+| Your machine, without AWS | `sunday-school-dev` | cognito-local |
+| Development and the demo | `sunday-school-dev` | AWS |
+| Production | `sunday-school-prod` | AWS |
+
+Accounts don't move between pools, so an account made while testing never shows up in production. Use the same name for the pool and the [DynamoDB table](#create-the-dynamodb-table) of an environment, so each Cognito user's ID (`user_id` in [the data model](data-model.md)) matches a Person in that environment's table. The production pool is created when the app is deployed ([#30](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/30)). Until then, use the development pool.
+
+### In cognito-local
+
+[cognito-local](https://github.com/jagregory/cognito-local) runs a Cognito user pool on your machine, so you don't need an AWS account. It's a community project, not made by AWS. Start it in Docker and leave it running:
+
+```sh
+docker run --rm -p 9229:9229 -v sunday-school-cognito:/app/.cognito jagregory/cognito-local
+```
+
+The `-v` option keeps the pool in a Docker volume named `sunday-school-cognito`, so the pool, its IDs and the accounts in it are still there after you stop the container. To start over, stop the container and run `docker volume rm sunday-school-cognito`.
+
+Then, in another terminal, create the pool:
+
+```sh
+cd api
+COGNITO_ENDPOINT=http://localhost:9229 COGNITO_USER_POOL_NAME=sunday-school-dev npm run cognito:create
+# Created user pool sunday-school-dev and its app client sunday-school-api.
+#
+# Put these lines in api/.env:
+#
+# COGNITO_USER_POOL_ID=local_...
+# COGNITO_CLIENT_ID=...
+# COGNITO_ENDPOINT=http://localhost:9229
+```
+
+With `COGNITO_ENDPOINT` set, you don't need AWS credentials or a region. If it says it couldn't connect, check that the container is running and the port matches.
+
+cognito-local doesn't send email. When someone signs up, it prints their verification code in the terminal where the container is running. It also differs from Cognito in AWS in ways that matter to the API:
+
+- Its tokens' issuer (`iss`) is `http://0.0.0.0:9229/<pool ID>` instead of `https://cognito-idp.<region>.amazonaws.com/<pool ID>`, and its signing keys are at `http://localhost:9229/<pool ID>/.well-known/jwks.json`.
+- Sign-in treats letter case in the email as significant, even though the pool is set to ignore it.
+
+### In AWS
+
+You need AWS credentials allowed to call `cognito-idp:ListUserPools`, `cognito-idp:DescribeUserPool`, `cognito-idp:CreateUserPool`, `cognito-idp:ListUserPoolClients`, `cognito-idp:DescribeUserPoolClient` and `cognito-idp:CreateUserPoolClient`, and a region, set the same way as for [the table](#in-aws). Create the pool in the same region as the table. Then:
+
+```sh
+cd api
+COGNITO_USER_POOL_NAME=sunday-school-dev npm run cognito:create
+```
+
+It prints the IDs and the region to put in `api/.env`, as above. The development pool stays within [Cognito's free tier](https://aws.amazon.com/cognito/pricing/).
+
+Until SES is set up (Milestone 2), the pool sends verification emails through Cognito's built-in sender, which sends at most 50 emails a day.
+
+To delete a pool you no longer need, first turn off its deletion protection in the Cognito console.
+
+### Where the IDs go
+
+The API gets its Cognito settings from `api/.env` (or your shell):
+
+| Variable | What it's for |
+|---|---|
+| `COGNITO_USER_POOL_ID` | The pool's ID, such as `us-east-1_AbCdEf123`. |
+| `COGNITO_CLIENT_ID` | The app client's ID. |
+| `AWS_REGION` | The pool's region, such as `us-east-1`. Not needed with cognito-local. |
+| `COGNITO_ENDPOINT` | Set to `http://localhost:9229` to use cognito-local. |
+
+If you haven't made `api/.env` yet, copy the example and paste in the lines the command printed:
+
+```sh
+cd api
+cp .env.example .env
+```
+
+The IDs aren't secret, since the app client has no secret, but they belong to one environment, so keep them in `.env` rather than in the code.
