@@ -10,7 +10,7 @@ import {
 import { mockClient } from "aws-sdk-client-mock";
 import { ensureTable, tableDefinition } from "./table.js";
 
-const ddb = mockClient(DynamoDBClient);
+const mockDb = mockClient(DynamoDBClient);
 const client = new DynamoDBClient({ region: "local" });
 
 const notFound = () => new ResourceNotFoundException({ message: "not found", $metadata: {} });
@@ -30,7 +30,7 @@ function describedTable(tableName: string): TableDescription {
 }
 
 beforeEach(() => {
-  ddb.reset();
+  mockDb.reset();
 });
 
 describe("tableDefinition", () => {
@@ -83,27 +83,27 @@ describe("tableDefinition", () => {
 
 describe("ensureTable", () => {
   it("creates the table when it doesn't exist and waits for it", async () => {
-    ddb
+    mockDb
       .on(DescribeTableCommand)
       .rejectsOnce(notFound())
       .resolves({ Table: describedTable("test-table") });
-    ddb.on(CreateTableCommand).resolves({});
+    mockDb.on(CreateTableCommand).resolves({});
 
     await expect(ensureTable(client, "test-table")).resolves.toBe("created");
 
-    const creates = ddb.commandCalls(CreateTableCommand);
+    const creates = mockDb.commandCalls(CreateTableCommand);
     expect(creates).toHaveLength(1);
     expect(creates[0]?.args[0].input).toEqual(tableDefinition("test-table"));
     // The first describe finds nothing; the waiter's describe sees ACTIVE.
-    expect(ddb.commandCalls(DescribeTableCommand)).toHaveLength(2);
+    expect(mockDb.commandCalls(DescribeTableCommand)).toHaveLength(2);
   });
 
   it("leaves an existing table that matches alone", async () => {
-    ddb.on(DescribeTableCommand).resolves({ Table: describedTable("test-table") });
+    mockDb.on(DescribeTableCommand).resolves({ Table: describedTable("test-table") });
 
     await expect(ensureTable(client, "test-table")).resolves.toBe("exists");
 
-    expect(ddb.commandCalls(CreateTableCommand)).toHaveLength(0);
+    expect(mockDb.commandCalls(CreateTableCommand)).toHaveLength(0);
   });
 
   it("accepts an existing table with extra indexes", async () => {
@@ -112,7 +112,7 @@ describe("ensureTable", () => {
       IndexName: "Extra",
       KeySchema: [{ AttributeName: "other", KeyType: "HASH" }],
     });
-    ddb.on(DescribeTableCommand).resolves({ Table: table });
+    mockDb.on(DescribeTableCommand).resolves({ Table: table });
 
     await expect(ensureTable(client, "test-table")).resolves.toBe("exists");
   });
@@ -122,15 +122,15 @@ describe("ensureTable", () => {
     table.GlobalSecondaryIndexes = table.GlobalSecondaryIndexes?.filter(
       (gsi) => gsi.IndexName !== "ByEmail",
     );
-    ddb.on(DescribeTableCommand).resolves({ Table: table });
+    mockDb.on(DescribeTableCommand).resolves({ Table: table });
 
     await expect(ensureTable(client, "test-table")).rejects.toThrow("index ByEmail is missing");
 
-    expect(ddb.commandCalls(CreateTableCommand)).toHaveLength(0);
+    expect(mockDb.commandCalls(CreateTableCommand)).toHaveLength(0);
   });
 
   it("reports an existing table with a different key", async () => {
-    ddb.on(DescribeTableCommand).resolves({
+    mockDb.on(DescribeTableCommand).resolves({
       Table: { ...describedTable("test-table"), KeySchema: [{ AttributeName: "id", KeyType: "HASH" }] },
     });
 
@@ -145,7 +145,7 @@ describe("ensureTable", () => {
     if (gsi1) {
       gsi1.KeySchema = [{ AttributeName: "gsi1pk", KeyType: "HASH" }];
     }
-    ddb.on(DescribeTableCommand).resolves({ Table: table });
+    mockDb.on(DescribeTableCommand).resolves({ Table: table });
 
     await expect(ensureTable(client, "test-table")).rejects.toThrow(
       "index GSI1 has key gsi1pk (HASH), not gsi1pk (HASH), gsi1sk (RANGE)",
@@ -153,11 +153,11 @@ describe("ensureTable", () => {
   });
 
   it("treats a table created by someone else mid-run as existing", async () => {
-    ddb
+    mockDb
       .on(DescribeTableCommand)
       .rejectsOnce(notFound())
       .resolves({ Table: describedTable("test-table") });
-    ddb
+    mockDb
       .on(CreateTableCommand)
       .rejects(new ResourceInUseException({ message: "in use", $metadata: {} }));
 
@@ -165,9 +165,9 @@ describe("ensureTable", () => {
   });
 
   it("passes on other errors", async () => {
-    ddb.on(DescribeTableCommand).rejects(new Error("AccessDeniedException"));
+    mockDb.on(DescribeTableCommand).rejects(new Error("AccessDeniedException"));
 
     await expect(ensureTable(client, "test-table")).rejects.toThrow("AccessDeniedException");
-    expect(ddb.commandCalls(CreateTableCommand)).toHaveLength(0);
+    expect(mockDb.commandCalls(CreateTableCommand)).toHaveLength(0);
   });
 });
