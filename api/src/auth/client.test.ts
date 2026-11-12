@@ -39,6 +39,12 @@ describe("cognitoConfigFrom", () => {
     );
   });
 
+  it("prints the command in plain backticks, with no backslashes", () => {
+    expect(() => cognitoConfigFrom({})).toThrow(
+      "`npm run cognito:create` prints the values; see docs/setup.md.",
+    );
+  });
+
   it("requires AWS_REGION when using AWS", () => {
     expect(() => cognitoConfigFrom(ids)).toThrow("Set AWS_REGION.");
   });
