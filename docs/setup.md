@@ -13,6 +13,7 @@ This guide takes you from a fresh clone to the app running on your machine. The 
 7. [Create the Cognito user pool](#create-the-cognito-user-pool), in cognito-local or in AWS, and where the IDs go
 8. Load the seed data, and which account to sign in with (not written yet, [#34](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/34))
 9. Deploy (not written yet): ship the app to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
+10. [When things go wrong](#when-things-go-wrong)
 
 ## Before you start
 
@@ -20,17 +21,20 @@ You need:
 
 - [Git](https://git-scm.com/downloads)
 - [Node.js](https://nodejs.org/) 20.19+, 22.13+, or 24+, which comes with npm. Run `node --version` to check. Versions 21 and 23 are not supported.
+- [curl](https://curl.se/download.html), used below to check that the API is running. It comes preinstalled on macOS and most Linux distributions, and with Windows 10 and later.
 
 The sections written so far don't need an AWS account. To run the database and sign-in on your machine instead of in AWS, you also need [Docker](https://docs.docker.com/get-started/get-docker/).
 
 ## Get the code
 
-```sh
-git clone https://github.com/Sunday-School-Software/Sunday-School-Scheduler.git
-cd Sunday-School-Scheduler
-```
+1. Clone the repository and move into it:
 
-If you plan to open a pull request, [fork the repository](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo) first and clone your fork instead (see [the pull request process](../CONTRIBUTING.md#the-pull-request-process)).
+   ```sh
+   git clone https://github.com/Sunday-School-Software/Sunday-School-Scheduler.git
+   cd Sunday-School-Scheduler
+   ```
+
+   If you plan to open a pull request, [fork the repository](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo) first and clone your fork instead (see [the pull request process](../CONTRIBUTING.md#the-pull-request-process)).
 
 The commands in each section below start from this folder, the root of the repository.
 
@@ -38,18 +42,29 @@ The commands in each section below start from this folder, the root of the repos
 
 You need Node.js 20.19+, 22.13+, or 24+. The tools these projects use (ESLint, Jest and Vite) don't support the versions in between.
 
-```sh
-cd api
-npm install
-npm run dev
-```
+1. Move into the API folder and install its dependencies:
 
-The API listens on http://localhost:3000 (set `PORT` to change it). Check that it's up:
+   ```sh
+   cd api
+   npm install
+   ```
 
-```sh
-curl http://localhost:3000/api/health
-# {"status":"ok"}
-```
+2. Start the API:
+
+   ```sh
+   npm run dev
+   ```
+
+   The API listens on http://localhost:3000 (set `PORT` to change it). Leave it running while you work through the rest of this guide.
+
+3. Check that it's up:
+
+   ```sh
+   curl http://localhost:3000/api/health
+   # {"status":"ok"}
+   ```
+
+   **Checkpoint:** the command prints `{"status":"ok"}`. If curl reports that it could not connect, the API is not running yet — give `npm run dev` a moment, and see [When things go wrong](#when-things-go-wrong) if it keeps failing.
 
 | Command | What it does |
 |---|---|
@@ -67,15 +82,26 @@ The API and these commands read their settings from environment variables. To av
 
 ## Run the UI locally
 
-You need the same Node.js version as the API. Start the API first and leave it running. Then open a second terminal in the root of the repository and run:
+You need the same Node.js version as the API.
 
-```sh
-cd web
-npm install
-npm run dev
-```
+1. Start the API first (see the previous section) and leave it running.
 
-Open http://localhost:5173. The page calls `GET /api/health` and shows the result, so you'll see the API's `{"status":"ok"}` response when the API is running and an error when it isn't.
+2. Open a second terminal in the root of the repository, move into the UI folder and install its dependencies:
+
+   ```sh
+   cd web
+   npm install
+   ```
+
+3. Start the UI:
+
+   ```sh
+   npm run dev
+   ```
+
+4. Open http://localhost:5173. The page calls `GET /api/health` and shows the result, so you'll see the API's `{"status":"ok"}` response when the API is running and an error when it isn't.
+
+   **Checkpoint:** the page shows `{"status":"ok"}`. If it shows an error instead, the API is not reachable — check it is still running in its terminal (step 1), and see [When things go wrong](#when-things-go-wrong).
 
 The dev server forwards every `/api` request to the API at http://localhost:3000, the same way Caddy does in production, so the UI uses the same `/api` paths in both. If the API runs somewhere else, set `API_URL` when you start the UI (for example `API_URL=http://localhost:4000 npm run dev`).
 
@@ -93,12 +119,16 @@ The dev server forwards every `/api` request to the API at http://localhost:3000
 
 Each project has its own tests, run with [Jest](https://jestjs.io/):
 
-```sh
-(cd api && npm test)
-(cd web && npm test)
-```
+1. Run the API tests and the UI tests, one line each:
+
+   ```sh
+   (cd api && npm test)
+   (cd web && npm test)
+   ```
 
 The tests don't need the API running, an AWS account, or network access. `npm test` exits with a non-zero code if any test fails.
+
+**Checkpoint:** both suites report that every test passed. A failure on a fresh clone, before you have changed anything, is worth reporting — see [When things go wrong](#when-things-go-wrong).
 
 Put a test next to the file it tests and name it `<file>.test.ts` (or `.test.tsx` in `web/`). To write a new one, copy an example:
 
@@ -242,3 +272,12 @@ cp .env.example .env
 ```
 
 The IDs aren't secret, since the app client has no secret, but they belong to one environment, so keep them in `.env` rather than in the code.
+
+## When things go wrong
+
+- **`node --version` prints 21, 23, or something older than 20.** The tools these projects use (ESLint, Jest and Vite) don't support those versions. Install Node.js 20.19+, 22.13+, or 24+ and try again.
+- **`npm install` fails.** Check you are in the right folder — the API and the UI each have their own `package.json`, so install from `api/` for the API and from `web/` for the UI — and that `node --version` shows a supported version (see above).
+- **The API stops with `EADDRINUSE` (address already in use) for port 3000.** Something is already listening on that port, often the API itself in another terminal. Stop that process, or run the API on another port with `PORT`, for example `PORT=4000 npm run dev`. If you change the API's port, start the UI with the matching `API_URL` (for example `API_URL=http://localhost:4000 npm run dev`) so it forwards `/api` to the right place.
+- **The curl checkpoint cannot connect (`Failed to connect`).** The API is not running. Look at the terminal where you ran `npm run dev` for the error it stopped on; if there is none, give it a few seconds to start and try the check again.
+- **The UI loads but shows an error instead of `{"status":"ok"}`.** The page reached the UI dev server but not the API. Make sure the API is running (its checkpoint above) and, if you moved it to another port, that the UI was started with the matching `API_URL`.
+- **`npm start` or `npm run preview` cannot find `dist/`.** Both run the compiled build. Run `npm run build` in the same project first.
