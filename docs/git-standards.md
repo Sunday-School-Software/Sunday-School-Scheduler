@@ -36,7 +36,7 @@ Convention: a change is ready to merge into `main` only when every item below is
 **Scope:** the PR is one logical change, small enough to review in one sitting.
 - [ ] **Issue:** if there's a linked issue, the PR description says `Closes #N`.
 - [ ] **Acceptance criteria:** every acceptance criterion in the linked issue is met, or the PR says which ones aren't and why.
-- [ ] **Tests, lint, and types:** `npm test`, `npm run lint`, and `npm run typecheck` pass in each project the change touches (`api/`, `web/`, or both). Run them from inside that project's folder (see the [setup guide](setup.md)). There's no CI yet, so the author runs them and the PR says which ones were run. If the change touches neither project, the PR says so.
+- [ ] **Tests, lint, types, and build:** `npm test`, `npm run lint`, `npm run typecheck`, and `npm run build` pass in each project the change touches (`api/`, `web/`, or both). CI runs these commands on every push and pull request for each project the change touches, and the PR's checks show the results. To run them yourself first, run them from inside that project's folder (see the [setup guide](setup.md)). If the change touches neither project, CI runs no checks and the PR says so.
 - [ ] **New tests:** new or changed behavior comes with tests that cover it.
 - [ ] **Docs:** each doc the change affects is updated in the same PR:
   - How to install, run, test, or configure anything: [`docs/setup.md`](setup.md).
@@ -52,7 +52,7 @@ Convention: a change is ready to merge into `main` only when every item below is
 Who confirms each item:
 
 - The author checks every item before requesting review, using the checklist in the PR template.
-- The reviewer confirms every item before approving, including re-running tests.
+- The reviewer confirms every item before approving, including that the PR's CI checks pass.
 - The maintainer checks that every item is still true before squash-merging.
 
 Purpose: to give one list, in one place, that anyone can use to tell from the PR whether a change is done.

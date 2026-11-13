@@ -9,11 +9,12 @@ This guide takes you from a fresh clone to the app running on your machine. The 
 3. [Run the API locally](#run-the-api-locally)
 4. [Run the UI locally](#run-the-ui-locally)
 5. [Run the tests](#run-the-tests)
-6. [Create the DynamoDB table](#create-the-dynamodb-table), in DynamoDB Local or in AWS
-7. [Create the Cognito user pool](#create-the-cognito-user-pool), in cognito-local or in AWS, and where the IDs go
-8. [Load the seed data](#load-the-seed-data), and which account to sign in with
-9. Deploy (not written yet): ship the app to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
-10. [When things go wrong](#when-things-go-wrong)
+6. [Continuous integration](#continuous-integration), what runs on every push and pull request
+7. [Create the DynamoDB table](#create-the-dynamodb-table), in DynamoDB Local or in AWS
+8. [Create the Cognito user pool](#create-the-cognito-user-pool), in cognito-local or in AWS, and where the IDs go
+9. [Load the seed data](#load-the-seed-data), and which account to sign in with
+10. Deploy (not written yet): ship the app to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
+11. [When things go wrong](#when-things-go-wrong)
 
 ## Before you start
 
@@ -137,6 +138,36 @@ Put a test next to the file it tests and name it `<file>.test.ts` (or `.test.tsx
 - `web/src/App.test.tsx` renders a component with [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/) and replaces `fetch` with a mock, so it never calls the API. The test environment (jsdom) has no `fetch` or `Response`, so mock every API call and build responses as plain objects, as this file does.
 
 Import `describe`, `it`, `expect` and `jest` from `@jest/globals`, so TypeScript knows their types. Jest still sets them as globals too, and React Testing Library relies on that to clean up after each test, so don't turn the globals off. To run one file, or rerun tests when files change, pass Jest options after `--`, for example `npm test -- src/App.test.tsx` or `npm test -- --watch`.
+
+CI runs these tests for you on every push and pull request (see [Continuous integration](#continuous-integration)).
+
+## Continuous integration
+
+GitHub Actions runs the checks for you on every push to any branch and on every pull request to `main`, including pull requests from forks. Each project has its own workflow:
+
+| Workflow | File | Runs when a change touches |
+|---|---|---|
+| API CI | `.github/workflows/api.yml` | `api/`, or the workflow file itself |
+| Web CI | `.github/workflows/web.yml` | `web/`, or the workflow file itself |
+
+Each workflow uses Node.js 22 and runs these commands, in order, from inside the project's folder: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. The first command that fails stops the run and fails the check. npm downloads are cached using the project's `package-lock.json`.
+
+A change that touches nothing in a project doesn't run that project's checks, so a change to only `docs/` runs neither. On a pull request, the Checks tab shows which workflow ran and which step failed.
+
+The checks need no AWS account, network access or secrets, for the same reason the tests don't (see [Run the tests](#run-the-tests)).
+
+To reproduce a CI run on your machine, run the same commands from the project's folder:
+
+```sh
+cd api   # or: cd web
+npm ci
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+`npm ci` installs exactly what `package-lock.json` says, and fails if `package.json` and the lockfile disagree. Use it instead of `npm install` when you want the same result as CI.
 
 ## Create the DynamoDB table
 
@@ -314,6 +345,7 @@ The seed data is made up. Never put real ward members' names or email addresses 
 
 - **`node --version` prints 21, 23, or something older than 20.** The tools these projects use (ESLint, Jest and Vite) don't support those versions. Install Node.js 20.19+, 22.13+, or 24+ and try again.
 - **`npm install` fails.** Check you are in the right folder — the API and the UI each have their own `package.json`, so install from `api/` for the API and from `web/` for the UI — and that `node --version` shows a supported version (see above).
+- **CI fails at `npm ci` with a message that `package.json` and `package-lock.json` are out of sync.** The lockfile doesn't match `package.json`, usually because a dependency was changed without updating the lockfile. Run `npm install` in that project's folder, commit the updated `package-lock.json`, and push again.
 - **The API stops with `EADDRINUSE` (address already in use) for port 3000.** Something is already listening on that port, often the API itself in another terminal. Stop that process, or run the API on another port with `PORT`, for example `PORT=4000 npm run dev`. If you change the API's port, start the UI with the matching `API_URL` (for example `API_URL=http://localhost:4000 npm run dev`) so it forwards `/api` to the right place.
 - **The curl checkpoint cannot connect (`Failed to connect`).** The API is not running. Look at the terminal where you ran `npm run dev` for the error it stopped on; if there is none, give it a few seconds to start and try the check again.
 - **The UI loads but shows an error instead of `{"status":"ok"}`.** The page reached the UI dev server but not the API. Make sure the API is running (its checkpoint above) and, if you moved it to another port, that the UI was started with the matching `API_URL`.
