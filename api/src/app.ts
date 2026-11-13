@@ -1,5 +1,6 @@
 import express from "express";
 import { authRouter } from "./routes/auth.js";
+import { bodyErrorHandler } from "./routes/errors.js";
 import { healthRouter } from "./routes/health.js";
 import type { AuthService } from "./services/auth.js";
 
@@ -14,6 +15,8 @@ export function createApp(services: Services) {
 
   app.use("/api/health", healthRouter);
   app.use("/api", authRouter(services.auth));
+
+  app.use(bodyErrorHandler);
 
   return app;
 }
