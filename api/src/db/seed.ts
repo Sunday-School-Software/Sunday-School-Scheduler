@@ -62,27 +62,6 @@ export function seedPasswordFrom(env: Record<string, string | undefined> = proce
   return password;
 }
 
-// The next `count` Sundays as YYYY-MM-DD, counting today if it's a Sunday. Uses
-// the machine's local date, as the dashboard's 28-day window does (#37), so 4
-// Sundays always fit inside that window.
-export function nextSundays(today: Date, count: number): string[] {
-  const day = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  day.setDate(day.getDate() + ((7 - day.getDay()) % 7));
-
-  const sundays: string[] = [];
-  for (let i = 0; i < count; i++) {
-    sundays.push(localDate(day));
-    day.setDate(day.getDate() + 7);
-  }
-  return sundays;
-}
-
-function localDate(day: Date): string {
-  const month = String(day.getMonth() + 1).padStart(2, "0");
-  const date = String(day.getDate()).padStart(2, "0");
-  return `${day.getFullYear()}-${month}-${date}`;
-}
-
 export type Item = Record<string, AttributeValue>;
 
 function item(fields: Record<string, string | number>): Item {

@@ -4,12 +4,12 @@ import { mockClient } from "aws-sdk-client-mock";
 import {
   SEED_SUNDAYS,
   SEED_TEACHERS,
-  nextSundays,
   seedItems,
   seedPasswordFrom,
   writeItems,
   type Item,
 } from "./seed.js";
+import { nextSundays } from "../dates.js";
 
 const mockDb = mockClient(DynamoDBClient);
 const client = new DynamoDBClient({ region: "local" });
@@ -26,45 +26,6 @@ const find = (items: Item[], pk: string, sk: string) =>
 beforeEach(() => {
   mockDb.reset();
   mockDb.on(PutItemCommand).resolves({});
-});
-
-describe("nextSundays", () => {
-  it("starts at the coming Sunday", () => {
-    // Thursday, Nov 12, 2026.
-    expect(nextSundays(new Date(2026, 10, 12, 23, 30), 4)).toEqual(sundays);
-  });
-
-  it("counts today when today is a Sunday", () => {
-    expect(nextSundays(new Date(2026, 10, 15), 2)).toEqual(["2026-11-15", "2026-11-22"]);
-  });
-
-  it("starts tomorrow when today is a Saturday", () => {
-    expect(nextSundays(new Date(2026, 10, 14), 1)).toEqual(["2026-11-15"]);
-  });
-
-  it("crosses month and year ends", () => {
-    expect(nextSundays(new Date(2026, 11, 22), 3)).toEqual([
-      "2026-12-27",
-      "2027-01-03",
-      "2027-01-10",
-    ]);
-  });
-
-  it("stays inside the dashboard's 28-day window on every day of the week", () => {
-    for (let offset = 0; offset < 7; offset++) {
-      const today = new Date(2026, 10, 12 + offset);
-      const seeded = nextSundays(today, SEED_SUNDAYS);
-      const [year, month, day] = (seeded.at(-1) as string).split("-").map(Number) as [
-        number,
-        number,
-        number,
-      ];
-      const daysAway = (new Date(year, month - 1, day).getTime() - today.getTime()) / 86_400_000;
-
-      expect(seeded).toHaveLength(SEED_SUNDAYS);
-      expect(daysAway).toBeLessThanOrEqual(28);
-    }
-  });
 });
 
 describe("seedPasswordFrom", () => {
@@ -88,6 +49,22 @@ describe("SEED_TEACHERS", () => {
   it("uses a different ID for every person and class", () => {
     const ids = SEED_TEACHERS.flatMap((teacher) => [teacher.personId, ...teacher.classIds]);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("has as many Sundays as fit in the dashboard's 28-day window, on every day of the week", () => {
+    for (let offset = 0; offset < 7; offset++) {
+      const today = new Date(2026, 10, 12 + offset);
+      const seeded = nextSundays(today, SEED_SUNDAYS);
+      const [year, month, day] = (seeded.at(-1) as string).split("-").map(Number) as [
+        number,
+        number,
+        number,
+      ];
+      const daysAway = (new Date(year, month - 1, day).getTime() - today.getTime()) / 86_400_000;
+
+      expect(seeded).toHaveLength(SEED_SUNDAYS);
+      expect(daysAway).toBeLessThanOrEqual(28);
+    }
   });
 
   it("has a class ID for each seeded Sunday", () => {

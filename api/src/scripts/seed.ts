@@ -2,15 +2,9 @@
 // `npm run seed`; see docs/setup.md.
 import { cognitoConfigFrom, cognitoErrorMessage, createCognitoClient } from "../auth/client.js";
 import { ensureUser } from "../auth/users.js";
+import { nextSundays } from "../dates.js";
 import { createDynamoClient, errorMessage, tableNameFrom } from "../db/client.js";
-import {
-  SEED_SUNDAYS,
-  SEED_TEACHERS,
-  nextSundays,
-  seedItems,
-  seedPasswordFrom,
-  writeItems,
-} from "../db/seed.js";
+import { SEED_SUNDAYS, SEED_TEACHERS, seedItems, seedPasswordFrom, writeItems } from "../db/seed.js";
 import { loadEnvFile } from "../env.js";
 
 loadEnvFile();
