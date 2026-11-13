@@ -10,7 +10,7 @@ These are temporary on purpose. Don't build on them as if they were the real thi
 
 - **What happens:** there's no way to create classes, assign teachers or sign up in the app. The seed script creates two made-up teachers (with `example.com` addresses), their Cognito accounts, classes on the next 4 Sundays and pending assignments.
 - **When it bites:** whenever you want different data, or a new account.
-- **Workaround:** edit the seed script and run it again. Running it again doesn't create duplicates, and it resets every seeded assignment to pending.
+- **Workaround:** edit `api/src/db/seed.ts` and run `npm run seed` again (see the [setup guide](setup.md#load-the-seed-data)). Running it again doesn't create duplicates, and it resets every seeded assignment to pending.
 - **Tracked in:** [#34] (the seed script). Leaders building the schedule is [#48], and sign-up is [#69] (both Milestone 2).
 
 ### Nobody is notified when a teacher responds

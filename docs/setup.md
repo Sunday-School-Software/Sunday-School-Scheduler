@@ -11,7 +11,7 @@ This guide takes you from a fresh clone to the app running on your machine. The 
 5. [Run the tests](#run-the-tests)
 6. [Create the DynamoDB table](#create-the-dynamodb-table), in DynamoDB Local or in AWS
 7. [Create the Cognito user pool](#create-the-cognito-user-pool), in cognito-local or in AWS, and where the IDs go
-8. Load the seed data, and which account to sign in with (not written yet, [#34](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/34))
+8. [Load the seed data](#load-the-seed-data), and which account to sign in with
 9. Deploy (not written yet): ship the app to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
 10. [When things go wrong](#when-things-go-wrong)
 
@@ -77,6 +77,7 @@ You need Node.js 20.19+, 22.13+, or 24+. The tools these projects use (ESLint, J
 | `npm run lint:fix` | Fixes the ESLint problems it can fix automatically |
 | `npm run db:create` | Creates the DynamoDB table (see [Create the DynamoDB table](#create-the-dynamodb-table)) |
 | `npm run cognito:create` | Creates the Cognito user pool and app client (see [Create the Cognito user pool](#create-the-cognito-user-pool)) |
+| `npm run seed` | Loads made-up teachers, classes and assignments, and their accounts (see [Load the seed data](#load-the-seed-data)) |
 
 The API and these commands read their settings from environment variables. To avoid typing them each time, copy `api/.env.example` to `api/.env` and fill it in (see [Where the IDs go](#where-the-ids-go)). A variable set in your shell overrides the file. Git ignores `.env`, so your settings stay out of commits.
 
@@ -273,6 +274,42 @@ cp .env.example .env
 
 The IDs aren't secret, since the app client has no secret, but they belong to one environment, so keep them in `.env` rather than in the code.
 
+## Load the seed data
+
+Until leaders can build the schedule in the app (Milestone 2), the data comes from a seed script. `npm run seed` creates:
+
+- Two made-up teachers, **Teacher A** (`teacher.a@example.com`) and **Teacher B** (`teacher.b@example.com`). Each is a Person in the table and a user in the Cognito pool, linked by the user's ID.
+- A Gospel Doctrine class taught by Teacher A and a Youth Sunday School class taught by Teacher B on each of the next 4 Sundays, counting today if it's a Sunday.
+- A pending assignment for each teacher to each of their classes. Neither teacher is assigned to the other's classes, so you can check that the API rejects a change to someone else's assignment.
+
+You need the [table](#create-the-dynamodb-table) and the [user pool](#create-the-cognito-user-pool) first, in the same environment. The command reads `DYNAMODB_TABLE`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID` and `AWS_REGION` (or the two `_ENDPOINT` variables) from `api/.env`, like the commands above, plus one more:
+
+| Variable | What it's for |
+|---|---|
+| `SEED_PASSWORD` | The password for both seeded accounts. Required, with no default, so the password isn't published in this repository. It needs at least 8 characters, with an uppercase letter, a lowercase letter, a number and a symbol. |
+
+1. Choose a password and add it to `api/.env` as `SEED_PASSWORD=<your password>`. Don't reuse a password from anywhere else: anyone you share the development environment with can sign in with it.
+
+2. Load the data:
+
+   ```sh
+   cd api
+   npm run seed
+   # Created the account teacher.a@example.com.
+   # Created the account teacher.b@example.com.
+   #
+   # Wrote 2 teachers to sunday-school-dev, each with a pending assignment on 2026-11-15, 2026-11-22, 2026-11-29, 2026-12-06.
+   # Sign in as teacher.a@example.com or teacher.b@example.com, with SEED_PASSWORD as the password.
+   ```
+
+   **Checkpoint:** the last line names both accounts. Your dates will be the next 4 Sundays from the day you run it.
+
+3. Sign in as `teacher.a@example.com` with your `SEED_PASSWORD`. Sign in as `teacher.b@example.com` to try changing Teacher A's assignments.
+
+Running it again is safe, and it's how you reset the data before a demo or a user test. It finds the existing accounts instead of creating new ones and sets their password to `SEED_PASSWORD` again. It replaces the seeded classes and assignments, because their IDs are fixed (they start with `5eed0000`), so every assignment goes back to pending and the classes move to the next 4 Sundays. It leaves anything it didn't create alone.
+
+The seed data is made up. Never put real ward members' names or email addresses in it. To change it, edit `api/src/db/seed.ts` and run the command again.
+
 ## When things go wrong
 
 - **`node --version` prints 21, 23, or something older than 20.** The tools these projects use (ESLint, Jest and Vite) don't support those versions. Install Node.js 20.19+, 22.13+, or 24+ and try again.
@@ -280,4 +317,6 @@ The IDs aren't secret, since the app client has no secret, but they belong to on
 - **The API stops with `EADDRINUSE` (address already in use) for port 3000.** Something is already listening on that port, often the API itself in another terminal. Stop that process, or run the API on another port with `PORT`, for example `PORT=4000 npm run dev`. If you change the API's port, start the UI with the matching `API_URL` (for example `API_URL=http://localhost:4000 npm run dev`) so it forwards `/api` to the right place.
 - **The curl checkpoint cannot connect (`Failed to connect`).** The API is not running. Look at the terminal where you ran `npm run dev` for the error it stopped on; if there is none, give it a few seconds to start and try the check again.
 - **The UI loads but shows an error instead of `{"status":"ok"}`.** The page reached the UI dev server but not the API. Make sure the API is running (its checkpoint above) and, if you moved it to another port, that the UI was started with the matching `API_URL`.
+- **`npm run seed` says the table doesn't exist, or the user pool doesn't exist.** Create them first (see [Create the DynamoDB table](#create-the-dynamodb-table) and [Create the Cognito user pool](#create-the-cognito-user-pool)), and check that `DYNAMODB_TABLE` and `COGNITO_USER_POOL_ID` in `api/.env` are for the same environment.
+- **`npm run seed` says the password did not conform with policy.** `SEED_PASSWORD` is too simple for the pool. Use at least 8 characters, with an uppercase letter, a lowercase letter, a number and a symbol.
 - **`npm start` or `npm run preview` cannot find `dist/`.** Both run the compiled build. Run `npm run build` in the same project first.
