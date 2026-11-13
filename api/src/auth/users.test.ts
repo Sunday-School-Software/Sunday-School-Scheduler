@@ -82,7 +82,7 @@ describe("ensureUser", () => {
     );
   });
 
-  it("passes on Cognito's error when the password breaks the pool's rules", async () => {
+  it("rethrows Cognito's error when the password breaks the pool's rules", async () => {
     mockCognito.on(AdminSetUserPasswordCommand).rejects(
       new InvalidPasswordException({
         message: "Password did not conform with policy: Password not long enough",
@@ -95,7 +95,7 @@ describe("ensureUser", () => {
     );
   });
 
-  it("passes on errors other than a missing user", async () => {
+  it("rethrows errors other than a missing user", async () => {
     mockCognito.on(AdminGetUserCommand).rejects(new Error("AccessDeniedException"));
 
     await expect(ensureUser(client, "pool-1", "teacher@example.com", "Secret-1")).rejects.toThrow(

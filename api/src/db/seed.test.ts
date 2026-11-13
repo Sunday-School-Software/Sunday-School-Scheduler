@@ -186,7 +186,7 @@ describe("writeItems", () => {
     );
   });
 
-  it("passes on other errors", async () => {
+  it("rethrows other errors", async () => {
     mockDb.on(PutItemCommand).rejects(new Error("AccessDeniedException"));
 
     await expect(writeItems(client, "test-table", items)).rejects.toThrow("AccessDeniedException");
