@@ -133,7 +133,8 @@ The tests don't need the API running, an AWS account, or network access. `npm te
 
 Put a test next to the file it tests and name it `<file>.test.ts` (or `.test.tsx` in `web/`). To write a new one, copy an example:
 
-- `api/src/routes/health.test.ts` calls a route over HTTP with [Supertest](https://github.com/ladjs/supertest). It uses `createApp()` from `api/src/app.ts`, so no server has to be started.
+- `api/src/routes/health.test.ts` calls a route over HTTP with [Supertest](https://github.com/ladjs/supertest). It uses `createApp()` from `api/src/app.ts`, so no server has to be started. `createApp()` takes the services the routes call, such as the Auth Service.
+- `api/src/routes/auth.test.ts` does the same with Cognito replaced by [aws-sdk-client-mock](https://github.com/m-radzikowski/aws-sdk-client-mock), so it never calls AWS.
 - `web/src/App.test.tsx` renders a component with [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/) and replaces `fetch` with a mock, so it never calls the API. The test environment (jsdom) has no `fetch` or `Response`, so mock every API call and build responses as plain objects, as this file does.
 
 Import `describe`, `it`, `expect` and `jest` from `@jest/globals`, so TypeScript knows their types. Jest still sets them as globals too, and React Testing Library relies on that to clean up after each test, so don't turn the globals off. To run one file, or rerun tests when files change, pass Jest options after `--`, for example `npm test -- src/App.test.tsx` or `npm test -- --watch`.
@@ -238,6 +239,7 @@ cognito-local doesn't send email. When someone signs up, it prints their verific
 
 - Its tokens' issuer (`iss`) is `http://0.0.0.0:9229/<pool ID>` instead of `https://cognito-idp.<region>.amazonaws.com/<pool ID>`, and its signing keys are at `http://localhost:9229/<pool ID>/.well-known/jwks.json`.
 - Sign-in treats letter case in the email as significant, even though the pool is set to ignore it.
+- It can't sign anyone out. `POST /api/logout` answers 500, and the API logs `Unsupported x-amz-target header "GlobalSignOut"`. Use the pool in AWS to try signing out.
 
 ### In AWS
 
@@ -304,7 +306,18 @@ You need the [table](#create-the-dynamodb-table) and the [user pool](#create-the
 
    **Checkpoint:** the last line names both accounts. Your dates will be the next 4 Sundays from the day you run it.
 
-3. Sign in as `teacher.a@example.com` with your `SEED_PASSWORD`. Sign in as `teacher.b@example.com` to try changing Teacher A's assignments.
+3. Check that a seeded account can sign in. Start the API (see [Run the API locally](#run-the-api-locally)), or restart it if it was running when you edited `api/.env`, since it reads the file only when it starts. Then, in another terminal, put your `SEED_PASSWORD` in place of `<your password>`:
+
+   ```sh
+   curl -H 'Content-Type: application/json' \
+     -d '{"email":"teacher.a@example.com","password":"<your password>"}' \
+     http://localhost:3000/api/login
+   # {"accessToken":"eyJ..."}
+   ```
+
+   **Checkpoint:** the command prints an `accessToken`. `{"error":"Wrong email or password."}` means the password doesn't match the last `npm run seed`, or the API is using another pool. Check `COGNITO_USER_POOL_ID` and `COGNITO_CLIENT_ID` in `api/.env`.
+
+   Sign in as `teacher.b@example.com` to try changing Teacher A's assignments.
 
 Running it again is safe, and it's how you reset the data before a demo or a user test. It finds the existing accounts instead of creating new ones and sets their password to `SEED_PASSWORD` again. It replaces the seeded classes and assignments, because their IDs are fixed (they start with `5eed0000`), so every assignment goes back to pending and the classes move to the next 4 Sundays. It leaves anything it didn't create alone.
 
@@ -319,4 +332,5 @@ The seed data is made up. Never put real ward members' names or email addresses 
 - **The UI loads but shows an error instead of `{"status":"ok"}`.** The page reached the UI dev server but not the API. Make sure the API is running (its checkpoint above) and, if you moved it to another port, that the UI was started with the matching `API_URL`.
 - **`npm run seed` says the table doesn't exist, or the user pool doesn't exist.** Create them first (see [Create the DynamoDB table](#create-the-dynamodb-table) and [Create the Cognito user pool](#create-the-cognito-user-pool)), and check that `DYNAMODB_TABLE` and `COGNITO_USER_POOL_ID` in `api/.env` are for the same environment.
 - **`npm run seed` says the password did not conform with policy.** `SEED_PASSWORD` is too simple for the pool. Use at least 8 characters, with an uppercase letter, a lowercase letter, a number and a symbol. If your password already has all of those, check that it's in quotes in `api/.env`. Without them, everything from a `#` onward is read as a comment, so Cognito gets only the part before it.
+- **`POST /api/login` or `POST /api/logout` answers `Couldn't sign in` or `Couldn't sign out`.** Look at the terminal where the API is running. It prints `Login failed:` or `Logout failed:` and the reason, without the password or token. If it says to set `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID` or `AWS_REGION`, add them to `api/.env` (see [Where the IDs go](#where-the-ids-go)) and restart the API. Sign-out always fails against cognito-local (see [In cognito-local](#in-cognito-local)).
 - **`npm start` or `npm run preview` cannot find `dist/`.** Both run the compiled build. Run `npm run build` in the same project first.
