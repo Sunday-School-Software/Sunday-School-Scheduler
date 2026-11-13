@@ -288,7 +288,7 @@ You need the [table](#create-the-dynamodb-table) and the [user pool](#create-the
 |---|---|
 | `SEED_PASSWORD` | The password for both seeded accounts. Required, with no default, so the password isn't published in this repository. It needs at least 8 characters, with an uppercase letter, a lowercase letter, a number and a symbol. |
 
-1. Choose a password and add it to `api/.env` as `SEED_PASSWORD=<your password>`. Don't reuse a password from anywhere else: anyone you share the development environment with can sign in with it.
+1. Choose a password and add it to `api/.env` in quotes, as `SEED_PASSWORD="<your password>"`. Without the quotes, a `#` and everything after it is read as a comment and left out of the password. Don't reuse a password from anywhere else: anyone you share the development environment with can sign in with it.
 
 2. Load the data:
 
@@ -318,5 +318,5 @@ The seed data is made up. Never put real ward members' names or email addresses 
 - **The curl checkpoint cannot connect (`Failed to connect`).** The API is not running. Look at the terminal where you ran `npm run dev` for the error it stopped on; if there is none, give it a few seconds to start and try the check again.
 - **The UI loads but shows an error instead of `{"status":"ok"}`.** The page reached the UI dev server but not the API. Make sure the API is running (its checkpoint above) and, if you moved it to another port, that the UI was started with the matching `API_URL`.
 - **`npm run seed` says the table doesn't exist, or the user pool doesn't exist.** Create them first (see [Create the DynamoDB table](#create-the-dynamodb-table) and [Create the Cognito user pool](#create-the-cognito-user-pool)), and check that `DYNAMODB_TABLE` and `COGNITO_USER_POOL_ID` in `api/.env` are for the same environment.
-- **`npm run seed` says the password did not conform with policy.** `SEED_PASSWORD` is too simple for the pool. Use at least 8 characters, with an uppercase letter, a lowercase letter, a number and a symbol.
+- **`npm run seed` says the password did not conform with policy.** `SEED_PASSWORD` is too simple for the pool. Use at least 8 characters, with an uppercase letter, a lowercase letter, a number and a symbol. If your password already has all of those, check that it's in quotes in `api/.env`. Without them, everything from a `#` onward is read as a comment, so Cognito gets only the part before it.
 - **`npm start` or `npm run preview` cannot find `dist/`.** Both run the compiled build. Run `npm run build` in the same project first.
