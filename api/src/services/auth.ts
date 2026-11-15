@@ -7,7 +7,13 @@ import {
   UserNotFoundException,
   type CognitoIdentityProviderClient,
 } from "@aws-sdk/client-cognito-identity-provider";
+import type { Fetcher } from "aws-jwt-verify/https";
 import { cognitoConfigFrom, cognitoErrorMessage } from "../auth/client.js";
+import {
+  createAccessTokenVerifier,
+  isInvalidTokenError,
+  type AccessTokenVerifier,
+} from "../auth/verifier.js";
 
 type Env = Record<string, string | undefined>;
 
@@ -26,7 +32,8 @@ export class InvalidCredentialsError extends Error {
   }
 }
 
-// Cognito rejected the access token: it's expired, revoked or not one of ours.
+// The access token is missing, malformed, tampered with, expired, revoked or
+// not one of ours.
 export class InvalidTokenError extends Error {
   constructor() {
     super("The access token isn't valid.");
@@ -43,15 +50,22 @@ function unexpected(err: unknown, env: Env): Error {
 export interface AuthService {
   login(email: string, password: string): Promise<Session>;
   logout(accessToken: string): Promise<void>;
+  // Resolves to the signed-in user's ID (the Cognito sub, `user_id` in the data model).
+  verify(accessToken: string): Promise<string>;
 }
 
 // The Auth Service from design §4. Routes call this instead of Cognito.
 // The settings are read on each call rather than up front, so the API still
 // starts (and /api/health still works) before the user pool is set up.
+// `jwksFetcher` replaces how verify() downloads the pool's signing keys, for tests.
 export function createAuthService(
   client: CognitoIdentityProviderClient,
   env: Env = process.env,
+  jwksFetcher?: Fetcher,
 ): AuthService {
+  // Built on first use, and kept so the signing keys are downloaded only once.
+  let verifier: AccessTokenVerifier | undefined;
+
   return {
     async login(email, password) {
       const { clientId } = cognitoConfigFrom(env);
@@ -101,6 +115,27 @@ export function createAuthService(
         }
         throw unexpected(err, env);
       }
+    },
+
+    // Checks the token locally, without calling Cognito, so it's fast enough for
+    // every request. That also means a token still passes after logout() until
+    // it expires (see docs/known-issues.md).
+    async verify(accessToken) {
+      verifier ??= createAccessTokenVerifier(cognitoConfigFrom(env), jwksFetcher);
+      let payload;
+      try {
+        payload = await verifier.verify(accessToken);
+      } catch (err) {
+        if (isInvalidTokenError(err)) {
+          throw new InvalidTokenError();
+        }
+        throw unexpected(err, env);
+      }
+
+      if (typeof payload.sub !== "string" || !payload.sub) {
+        throw new InvalidTokenError();
+      }
+      return payload.sub;
     },
   };
 }
