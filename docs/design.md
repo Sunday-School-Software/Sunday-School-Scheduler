@@ -87,6 +87,8 @@ The UI runs in the browser. Everything else is one Node (TypeScript) process on 
 | Class Service | Classes, assignments and responses | DB | `createClass()`, `assign(class, person)`, `reassign(class, from, to)`, `listAssignments(person, dates)`, `listSchedule(dates)`, `update(class, person, status)` |
 | Email Service | Sends notification emails. | SES | `email(addresses, message)` → OK/error |
 
+**Inside the UI.** The UI follows the Model-View-Presenter pattern. React components hold only view logic, presenters call the API through services and tell the components what to show, and one `ServerFacade` makes every API call. The [setup guide](setup.md#how-the-ui-is-organized) describes the folders.
+
 **Who can do what.** A teacher sees and responds to only their own assignments; anything else returns 403. A leader can also create classes and people, assign and reassign teachers, record responses for anyone, and see the full schedule. An admin manages accounts and roles (beyond December; see §8).
 
 ```mermaid

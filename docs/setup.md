@@ -101,9 +101,9 @@ You need the same Node.js version as the API.
    npm run dev
    ```
 
-4. Open http://localhost:5173. The page calls `GET /api/health` and shows the result, so you'll see the API's `{"status":"ok"}` response when the API is running and an error when it isn't.
+4. Open http://localhost:5173. It opens the sign-in screen, because nobody is signed in yet.
 
-   **Checkpoint:** the page shows `{"status":"ok"}`. If it shows an error instead, the API is not reachable — check it is still running in its terminal (step 1), and see [When things go wrong](#when-things-go-wrong).
+   **Checkpoint:** the page shows a **Sign in** form. To check the UI can reach the API before you have an account, sign in with any email and password. `Wrong email or password.` or `Couldn't sign in. Please try again.` means the request reached the API. `Something went wrong. Please try again.` means it didn't: check the API is still running in its terminal (step 1), and see [When things go wrong](#when-things-go-wrong). To sign in for real, you need a seeded account (see [Load the seed data](#load-the-seed-data)).
 
 The dev server forwards every `/api` request to the API at http://localhost:3000, the same way Caddy does in production, so the UI uses the same `/api` paths in both. If the API runs somewhere else, set `API_URL` when you start the UI (for example `API_URL=http://localhost:4000 npm run dev`).
 
@@ -116,6 +116,16 @@ The dev server forwards every `/api` request to the API at http://localhost:3000
 | `npm run typecheck` | Type-checks without building the bundle |
 | `npm run lint` | Checks the code with ESLint |
 | `npm run lint:fix` | Fixes the ESLint problems it can fix automatically |
+
+### How the UI is organized
+
+The UI uses the Model-View-Presenter pattern, so the code that talks to the API can be tested without rendering anything:
+
+- **Views** are the React components in `web/src/components/`. They hold only view logic: state for what's on screen, and what to call when the user does something. Each one creates its presenter and hands it a view object, the functions the presenter may call, such as `displayErrorMessage()` or `navigate()`.
+- **Presenters** in `web/src/presenter/` decide what happens: they call a service, then tell the view what to show. Presenters for signed-in screens extend `SignedInPresenter`, which sends the user back to the sign-in screen when the API rejects their token with 401.
+- **Services** in `web/src/model/service/` call the API through `ServerFacade` in `web/src/network/`, the only code that calls `fetch`.
+
+The signed-in user's access token is kept in `sessionStorage`, so reloading the page keeps them signed in and closing the tab signs them out.
 
 ## Run the tests
 
@@ -136,7 +146,9 @@ Put a test next to the file it tests and name it `<file>.test.ts` (or `.test.tsx
 
 - `api/src/routes/health.test.ts` calls a route over HTTP with [Supertest](https://github.com/ladjs/supertest). It uses `createApp()` from `api/src/app.ts`, so no server has to be started. `createApp()` takes the services the routes call, such as the Auth Service.
 - `api/src/routes/auth.test.ts` does the same with Cognito replaced by [aws-sdk-client-mock](https://github.com/m-radzikowski/aws-sdk-client-mock), so it never calls AWS.
-- `web/src/App.test.tsx` renders a component with [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/) and replaces `fetch` with a mock, so it never calls the API. The test environment (jsdom) has no `fetch` or `Response`, so mock every API call and build responses as plain objects, as this file does.
+- `web/src/presenter/LoginPresenter.test.ts` tests a presenter (see [How the UI is organized](#how-the-ui-is-organized)) with its view and service replaced by [ts-mockito](https://github.com/TypeStrong/ts-mockito) mocks.
+- `web/src/components/login/Login.test.tsx` renders a component with [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/), passes it a mock presenter, and types and clicks with [user-event](https://testing-library.com/docs/user-event/intro).
+- `web/src/App.test.tsx` renders the whole app with real presenters and replaces `fetch` with a mock, so it never calls the API. The test environment (jsdom) has no `fetch` or `Response`, so mock every API call and build responses as plain objects, as this file does.
 
 Import `describe`, `it`, `expect` and `jest` from `@jest/globals`, so TypeScript knows their types. Jest still sets them as globals too, and React Testing Library relies on that to clean up after each test, so don't turn the globals off. To run one file, or rerun tests when files change, pass Jest options after `--`, for example `npm test -- src/App.test.tsx` or `npm test -- --watch`.
 
@@ -350,6 +362,10 @@ You need the [table](#create-the-dynamodb-table) and the [user pool](#create-the
 
    Sign in as `teacher.b@example.com` to try changing Teacher A's assignments.
 
+4. Sign in from the browser. Start the UI (see [Run the UI locally](#run-the-ui-locally)), open http://localhost:5173 and sign in as `teacher.a@example.com` with your `SEED_PASSWORD`.
+
+   **Checkpoint:** the dashboard opens with the heading **Your assignments**. **Sign out** returns to the sign-in screen. Against cognito-local, signing out still returns to the sign-in screen, even though the API can't sign the token out there.
+
 Running it again is safe, and it's how you reset the data before a demo or a user test. It finds the existing accounts instead of creating new ones and sets their password to `SEED_PASSWORD` again. It replaces the seeded classes and assignments, because their IDs are fixed (they start with `5eed0000`), so every assignment goes back to pending and the classes move to the next 4 Sundays. It leaves anything it didn't create alone.
 
 The seed data is made up. Never put real ward members' names or email addresses in it. To change it, edit `api/src/db/seed.ts` and run the command again.
@@ -361,7 +377,7 @@ The seed data is made up. Never put real ward members' names or email addresses 
 - **CI fails at `npm ci` with a message that `package.json` and `package-lock.json` are out of sync.** The lockfile doesn't match `package.json`, usually because a dependency was changed without updating the lockfile. Run `npm install` in that project's folder, commit the updated `package-lock.json`, and push again.
 - **The API stops with `EADDRINUSE` (address already in use) for port 3000.** Something is already listening on that port, often the API itself in another terminal. Stop that process, or run the API on another port with `PORT`, for example `PORT=4000 npm run dev`. If you change the API's port, start the UI with the matching `API_URL` (for example `API_URL=http://localhost:4000 npm run dev`) so it forwards `/api` to the right place.
 - **The curl checkpoint cannot connect (`Failed to connect`).** The API is not running. Look at the terminal where you ran `npm run dev` for the error it stopped on; if there is none, give it a few seconds to start and try the check again.
-- **The UI loads but shows an error instead of `{"status":"ok"}`.** The page reached the UI dev server but not the API. Make sure the API is running (its checkpoint above) and, if you moved it to another port, that the UI was started with the matching `API_URL`.
+- **Signing in says `Something went wrong. Please try again.`** The page reached the UI dev server but not the API. Make sure the API is running (its checkpoint above) and, if you moved it to another port, that the UI was started with the matching `API_URL`.
 - **`npm run seed` says the table doesn't exist, or the user pool doesn't exist.** Create them first (see [Create the DynamoDB table](#create-the-dynamodb-table) and [Create the Cognito user pool](#create-the-cognito-user-pool)), and check that `DYNAMODB_TABLE` and `COGNITO_USER_POOL_ID` in `api/.env` are for the same environment.
 - **`npm run seed` says the password did not conform with policy.** `SEED_PASSWORD` is too simple for the pool. Use at least 8 characters, with an uppercase letter, a lowercase letter, a number and a symbol. If your password already has all of those, check that it's in quotes in `api/.env`. Without them, everything from a `#` onward is read as a comment, so Cognito gets only the part before it.
 - **`POST /api/login` or `POST /api/logout` answers `Couldn't sign in` or `Couldn't sign out`.** Look at the terminal where the API is running. It prints `Login failed:` or `Logout failed:` and the reason, without the password or token. If it says to set `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID` or `AWS_REGION`, add them to `api/.env` (see [Where the IDs go](#where-the-ids-go)) and restart the API. Sign-out always fails against cognito-local (see [In cognito-local](#in-cognito-local)).
