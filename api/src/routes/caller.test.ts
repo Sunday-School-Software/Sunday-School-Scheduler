@@ -4,6 +4,7 @@ import {
   DynamoDBClient,
   InternalServerError,
   QueryCommand,
+  ResourceNotFoundException,
 } from "@aws-sdk/client-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
 import type { Request } from "express";
@@ -133,16 +134,36 @@ describe("requireCaller", () => {
     });
   });
 
-  it("returns a generic 500 and logs the reason when DynamoDB fails", async () => {
+  it("returns 503 and logs the reason when DynamoDB is down", async () => {
     mockDb
       .on(QueryCommand)
       .rejects(new InternalServerError({ message: "DynamoDB is down.", $metadata: {} }));
 
     const res = await getCaller(TOKEN);
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
     expect(res.body).toEqual({ error: "Something went wrong. Please try again." });
     expect(logged()).toEqual(["Identifying the caller failed: DynamoDB is down."]);
+  });
+
+  it("returns 503 when the connection to DynamoDB is refused", async () => {
+    mockDb.on(QueryCommand).rejects(Object.assign(new AggregateError([], ""), { code: "ECONNREFUSED" }));
+
+    const res = await getCaller(TOKEN);
+
+    expect(res.status).toBe(503);
+  });
+
+  it("returns a generic 500 for a DynamoDB error that retrying won't fix", async () => {
+    mockDb
+      .on(QueryCommand)
+      .rejects(new ResourceNotFoundException({ message: "Requested resource not found", $metadata: {} }));
+
+    const res = await getCaller(TOKEN);
+
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: "Something went wrong. Please try again." });
+    expect(logged()).toEqual(["Identifying the caller failed: Requested resource not found"]);
   });
 
   it("returns a generic 500 when the pool's signing keys can't be downloaded", async () => {

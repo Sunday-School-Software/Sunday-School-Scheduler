@@ -1,5 +1,18 @@
 import { describe, expect, it } from "@jest/globals";
-import { createDynamoClient, errorMessage, tableNameFrom } from "./client.js";
+import {
+  InternalServerError,
+  ProvisionedThroughputExceededException,
+  RequestLimitExceeded,
+  ResourceNotFoundException,
+  ThrottlingException,
+} from "@aws-sdk/client-dynamodb";
+import {
+  createDynamoClient,
+  DatabaseUnavailableError,
+  databaseError,
+  errorMessage,
+  tableNameFrom,
+} from "./client.js";
 
 describe("tableNameFrom", () => {
   it("returns DYNAMODB_TABLE, trimmed", () => {
@@ -64,5 +77,50 @@ describe("errorMessage", () => {
 
   it("handles values that aren't errors", () => {
     expect(errorMessage("boom", {})).toBe("boom");
+  });
+});
+
+describe("databaseError", () => {
+  const network = (code: string) => Object.assign(new AggregateError([], ""), { code });
+  const timeout = Object.assign(new Error("Connection timed out after 1000 ms"), { name: "TimeoutError" });
+
+  it.each([
+    ["a refused connection", network("ECONNREFUSED")],
+    ["a reset connection", network("ECONNRESET")],
+    ["a connection timeout", network("ETIMEDOUT")],
+    ["an unknown host", network("ENOTFOUND")],
+    ["a failed DNS lookup", network("EAI_AGAIN")],
+    ["the SDK's request timeout", timeout],
+    ["an InternalServerError", new InternalServerError({ message: "Internal error", $metadata: {} })],
+    [
+      "throttling",
+      new ProvisionedThroughputExceededException({ message: "Slow down", $metadata: {} }),
+    ],
+    ["a ThrottlingException", new ThrottlingException({ message: "Slow down", $metadata: {} })],
+    ["a RequestLimitExceeded", new RequestLimitExceeded({ message: "Slow down", $metadata: {} })],
+  ])("is a DatabaseUnavailableError for %s", (_name, err) => {
+    const wrapped = databaseError(err, {});
+
+    expect(wrapped).toBeInstanceOf(DatabaseUnavailableError);
+    expect(wrapped.cause).toBe(err);
+  });
+
+  it.each([
+    ["a missing table", new ResourceNotFoundException({ message: "Requested resource not found", $metadata: {} })],
+    ["a bad request", Object.assign(new Error("No such index"), { name: "ValidationException", $fault: "client" })],
+    ["a missing DYNAMODB_TABLE", new Error("Set DYNAMODB_TABLE")],
+    ["a value that isn't an error", "boom"],
+  ])("is a plain Error for %s, which retrying won't fix", (_name, err) => {
+    const wrapped = databaseError(err, {});
+
+    expect(wrapped).not.toBeInstanceOf(DatabaseUnavailableError);
+    expect(wrapped).toBeInstanceOf(Error);
+    expect(wrapped.cause).toBe(err);
+  });
+
+  it("keeps errorMessage()'s text", () => {
+    expect(databaseError(network("ECONNREFUSED"), { DYNAMODB_ENDPOINT: "http://localhost:8000" }).message).toBe(
+      "Couldn't connect to DynamoDB at http://localhost:8000. Is DynamoDB Local running? See docs/setup.md.",
+    );
   });
 });
