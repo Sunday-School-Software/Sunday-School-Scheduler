@@ -11,7 +11,7 @@ export interface DateWindow {
 const WINDOW_DAYS = 28;
 
 // "The next 4 Sundays" on the dashboard: today through 28 days from today
-// (#37). Time zones are on the roadmap.
+// (#37). Measuring it in the ward's time zone is #79.
 export function assignmentWindow(today: Date): DateWindow {
   const last = new Date(today.getFullYear(), today.getMonth(), today.getDate() + WINDOW_DAYS);
   return { from: localDate(today), to: localDate(last) };
