@@ -7,7 +7,7 @@ interface Props {
   presenter?: DashboardPresenter;
 }
 
-// A scaffold. The teacher's assignments come in #37.
+// A scaffold. The teacher's assignments come in #40.
 export default function Dashboard(props: Props) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 

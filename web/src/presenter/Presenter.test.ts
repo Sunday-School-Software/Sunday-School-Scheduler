@@ -4,7 +4,7 @@ import { ApiError, GENERIC_ERROR_MESSAGE, UnauthorizedError } from "../model/err
 import { SignedInPresenter, type SignedInView } from "./Presenter.ts";
 
 // Stands in for the signed-in presenters to come, such as the dashboard's
-// assignments (#37).
+// assignments (#40).
 class TestPresenter extends SignedInPresenter<SignedInView> {
   public constructor(view: SignedInView) {
     super(view);
