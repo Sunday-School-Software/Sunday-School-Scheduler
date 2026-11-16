@@ -74,7 +74,7 @@ Every read and write the app makes in Milestones 1 and 2. None of them scans the
 
 | # | Pattern | Service method | Milestone | How |
 |---|---|---|---|---|
-| 1 | The Person for the signed-in user, on every request | User `findByUser(user_id)` | 1 ([#36]) | Query `ByUser`: `user_id = :sub` |
+| 1 | The Person for the signed-in user, on every request | User `findByUserId(user_id)` | 1 ([#36]) | Query `ByUser`: `user_id = :sub` |
 | 2 | A teacher's assignments for the next 4 Sundays | Class `listAssignments(person, dates)` | 1 ([#37]) | Query `GSI1`: `gsi1pk = PERSON#<person_id>` and `gsi1sk BETWEEN :from AND :to` (see [Date windows](#date-windows)) |
 | 3 | A teacher confirms or requests a substitute | Class `update(class, person, status)` | 1 ([#38]) | UpdateItem on the assignment's key, with a condition (see [The conditional write](#the-conditional-write)) |
 | 4 | Seed teachers, classes and assignments | seed script | 1 ([#34]) | PutItem. A Put replaces the whole item, so running the script again resets every seeded assignment to `pending`. The script uses hard-coded keys rather than UUIDs to make this reset possible. |
@@ -108,7 +108,7 @@ UpdateExpression:    SET #status = :status, updated_at = :now
 ConditionExpression: attribute_exists(pk)
 ```
 
-- `person_id` is always the caller's own, from the verified JWT and `findByUser()`. It never comes from the request.
+- `person_id` is always the caller's own, from the verified JWT and `findByUserId()`. It never comes from the request.
 - **The condition is the permission check.** The assignment exists only if this person is assigned to this class. If they aren't, or a leader has just reassigned the class to someone else, DynamoDB rejects the write with `ConditionalCheckFailedException`, nothing changes, and the API returns 403 ([#38]).
 - **Without the condition**, UpdateItem would create the item if it didn't exist, so a teacher could assign themselves to any class, or bring back an assignment a leader had just removed.
 - Sending the same status twice succeeds both times and leaves the same result, so a retry after an error is safe.

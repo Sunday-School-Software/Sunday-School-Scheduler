@@ -11,7 +11,7 @@ declare module "express-serve-static-core" {
 }
 
 // Identifies the caller of every route mounted after it (design §4, step 2):
-// verify(jwt) gives the user_id, and findByUser(user_id) the Person and role.
+// verify(jwt) gives the user_id, and findByUserId(user_id) the Person and role.
 // A missing or bad token gets 401. A good token for an account that isn't
 // linked to a Person gets 403.
 export function requireCaller(
@@ -27,7 +27,7 @@ export function requireCaller(
 
     let person;
     try {
-      person = await userService.findByUser(await authService.verify(token));
+      person = await userService.findByUserId(await authService.verify(token));
     } catch (err) {
       if (err instanceof InvalidTokenError) {
         res.status(401).json({ error: "You're not signed in." });

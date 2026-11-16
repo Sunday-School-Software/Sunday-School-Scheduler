@@ -18,7 +18,7 @@ export interface Person {
 
 export interface UserService {
   // The Person linked to a Cognito user, or undefined if nobody is.
-  findByUser(userId: string): Promise<Person | undefined>;
+  findByUserId(userId: string): Promise<Person | undefined>;
 }
 
 function isRole(value: unknown): value is Role {
@@ -46,7 +46,7 @@ function personFrom(item: Record<string, AttributeValue>): Person {
 export function createUserService(client: DynamoDBClient, env: Env = process.env): UserService {
   return {
     // Access pattern 1 in docs/data-model.md.
-    async findByUser(userId) {
+    async findByUserId(userId) {
       let result;
       try {
         result = await client.send(

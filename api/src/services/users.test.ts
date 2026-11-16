@@ -25,9 +25,9 @@ beforeEach(() => {
   mockDb.on(QueryCommand).resolves({ Items: [personItem()] });
 });
 
-describe("findByUser", () => {
+describe("findByUserId", () => {
   it("returns the Person linked to the user, found through the ByUser index", async () => {
-    await expect(users.findByUser(USER_ID)).resolves.toEqual({
+    await expect(users.findByUserId(USER_ID)).resolves.toEqual({
       personId: teacher.personId,
       name: teacher.name,
       role: "teacher",
@@ -50,19 +50,19 @@ describe("findByUser", () => {
     delete item.email;
     mockDb.on(QueryCommand).resolves({ Items: [item] });
 
-    await expect(users.findByUser(USER_ID)).resolves.not.toHaveProperty("email");
+    await expect(users.findByUserId(USER_ID)).resolves.not.toHaveProperty("email");
   });
 
   it("returns undefined when no Person is linked to the user", async () => {
     mockDb.on(QueryCommand).resolves({ Items: [] });
 
-    await expect(users.findByUser(USER_ID)).resolves.toBeUndefined();
+    await expect(users.findByUserId(USER_ID)).resolves.toBeUndefined();
   });
 
   it("throws rather than pick one when two Persons are linked to the user", async () => {
     mockDb.on(QueryCommand).resolves({ Items: [personItem(), personItem()] });
 
-    await expect(users.findByUser(USER_ID)).rejects.toThrow(`2 Persons have user_id ${USER_ID}.`);
+    await expect(users.findByUserId(USER_ID)).rejects.toThrow(`2 Persons have user_id ${USER_ID}.`);
   });
 
   it.each([
@@ -75,7 +75,7 @@ describe("findByUser", () => {
     ) as Record<string, AttributeValue>;
     mockDb.on(QueryCommand).resolves({ Items: [item] });
 
-    await expect(users.findByUser(USER_ID)).rejects.toThrow(
+    await expect(users.findByUserId(USER_ID)).rejects.toThrow(
       `The Person item PERSON#${teacher.personId} needs a person_id, a name and a role`,
     );
   });
@@ -85,7 +85,7 @@ describe("findByUser", () => {
       .on(QueryCommand)
       .rejects(new InternalServerError({ message: "DynamoDB is down.", $metadata: {} }));
 
-    await expect(users.findByUser(USER_ID)).rejects.toThrow("DynamoDB is down.");
+    await expect(users.findByUserId(USER_ID)).rejects.toThrow("DynamoDB is down.");
   });
 
   it("says DynamoDB Local isn't running when the connection is refused", async () => {
@@ -95,13 +95,13 @@ describe("findByUser", () => {
     });
     mockDb.on(QueryCommand).rejects(Object.assign(new AggregateError([], ""), { code: "ECONNREFUSED" }));
 
-    await expect(local.findByUser(USER_ID)).rejects.toThrow(
+    await expect(local.findByUserId(USER_ID)).rejects.toThrow(
       "Couldn't connect to DynamoDB at http://localhost:8000. Is DynamoDB Local running?",
     );
   });
 
   it("throws without querying when DYNAMODB_TABLE isn't set", async () => {
-    await expect(createUserService(client, {}).findByUser(USER_ID)).rejects.toThrow(
+    await expect(createUserService(client, {}).findByUserId(USER_ID)).rejects.toThrow(
       "Set DYNAMODB_TABLE",
     );
     expect(mockDb.commandCalls(QueryCommand)).toHaveLength(0);

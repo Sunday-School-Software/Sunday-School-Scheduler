@@ -20,6 +20,7 @@ Details for each revision are in the commit messages (`git log docs/design.md`).
 | 2026-10-21 | Hyrum Kammerman | Trimmed a bit more and completed final proofread before submission. |
 | 2026-11-06 | Hyrum Kammerman | Matched the milestones to the repo's GitHub milestones; admin and broadcast moved beyond December |
 | 2026-11-09 | Hyrum Kammerman | Linked the DynamoDB key design ([data-model.md](data-model.md)) from §5, §6 and §7 |
+| 2026-11-16 | Hyrum Kammerman | Renamed `findByUser()` to `findByUserId()` to match the code |
 
 ---
 
@@ -83,7 +84,7 @@ The UI runs in the browser. Everything else is one Node (TypeScript) process on 
 | UI | Sign-in, teacher dashboard, leader schedule, teacher actions, and messages. | API | HTTPS JSON with the JWT, e.g. `POST /login`, `GET /assignments`, `PUT /assignments/{class}` |
 | API | Verifies caller, checks their role, calls services, and sends notifications. | UI and the four services | HTTP routes returning JSON and status codes (200, 403, 500) |
 | Auth Service | Signs users up and in through Cognito and verifies JWTs | Cognito | `register()`, `login()`, `logout()` → JWT; `verify(jwt)` → user_id |
-| User Service | Creates people, links and finds accounts and roles| DB | `create(name, email?)`, `linkAccount(user_id, email)`, `findByUser(user_id)` → Person, `listLeaders()` → emails |
+| User Service | Creates people, links and finds accounts and roles| DB | `create(name, email?)`, `linkAccount(user_id, email)`, `findByUserId(user_id)` → Person, `listLeaders()` → emails |
 | Class Service | Classes, assignments and responses | DB | `createClass()`, `assign(class, person)`, `reassign(class, from, to)`, `listAssignments(person, dates)`, `listSchedule(dates)`, `update(class, person, status)` |
 | Email Service | Sends notification emails. | SES | `email(addresses, message)` → OK/error |
 
@@ -107,7 +108,7 @@ flowchart LR
 
     ui -->|"HTTPS JSON + JWT → JSON"| api
     api -->|"register(), login(), logout() → JWT<br/>verify(jwt) → user_id"| auth
-    api -->|"create(), linkAccount(), findByUser(),<br/>listLeaders() → Person, role, emails"| user
+    api -->|"create(), linkAccount(), findByUserId(),<br/>listLeaders() → Person, role, emails"| user
     api -->|"createClass(), assign(), reassign(),<br/>listAssignments(), listSchedule(),<br/>update() → result or error"| cls
     api -->|"email(addresses, message) → error/OK"| email
     auth -->|"auth requests, signing keys → tokens"| cognito
@@ -128,7 +129,7 @@ One EC2 instance, in the same AWS account as Cognito, DynamoDB and SES, runs Cad
 **A teacher confirms an assigned lesson.**
 
 1. The signed-in teacher opens the dashboard.
-2. UI → API `GET /assignments`. The API identifies the caller with `verify(jwt)` → user_id and `findByUser(user_id)` → Person and role.
+2. UI → API `GET /assignments`. The API identifies the caller with `verify(jwt)` → user_id and `findByUserId(user_id)` → Person and role.
 3. API → Class Service `listAssignments(person, next 4 Sundays)`. The UI renders the dashboard.
 4. The teacher clicks **Confirm**. UI → API `PUT /assignments/{class}`. The API identifies the caller again and checks that the assignment is theirs (or that they're a leader).
 5. API → Class Service `update(class, person, status)`, a conditional write that returns OK.
@@ -159,7 +160,7 @@ sequenceDiagram
     UI->>+API: GET /assignments (JWT)
     API->>+Auth: verify(jwt)
     Auth-->>-API: user_id
-    API->>+User: findByUser(user_id)
+    API->>+User: findByUserId(user_id)
     User->>+DB: get Person
     DB-->>-User: Person
     User-->>-API: Person, role
@@ -171,7 +172,7 @@ sequenceDiagram
     UI-->>-T: renders dashboard
     T->>+UI: clicks Confirm
     UI->>+API: PUT /assignments/{class} (JWT)
-    Note over API,User: verify(jwt) and findByUser() as above,<br/>then check: a teacher may change only their own assignment
+    Note over API,User: verify(jwt) and findByUserId() as above,<br/>then check: a teacher may change only their own assignment
     API->>+Class: update(class, person, status)
     Class->>DB: conditional update
     alt DB write succeeds
