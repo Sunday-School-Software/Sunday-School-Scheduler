@@ -23,4 +23,11 @@ export default defineConfig([
       },
     },
   },
+  {
+    // ts-mockito's matchers, such as anything(), are typed `any`.
+    files: ["**/*.test.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-unsafe-argument": "off",
+    },
+  },
 ]);

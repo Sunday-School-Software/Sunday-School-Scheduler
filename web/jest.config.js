@@ -2,6 +2,7 @@
 export default {
   testEnvironment: "jsdom",
   roots: ["<rootDir>/src"],
+  setupFiles: ["<rootDir>/test/polyfills.cjs"],
   setupFilesAfterEnv: ["<rootDir>/src/setupTests.ts"],
   // Vite handles CSS and asset imports in the app. Jest can't load them, so swap in stubs.
   moduleNameMapper: {
