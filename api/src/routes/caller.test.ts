@@ -127,7 +127,10 @@ describe("requireCaller", () => {
     const res = await getCaller(TOKEN);
 
     expect(res.status).toBe(403);
-    expect(res.body).toEqual({ error: "Your account isn't set up yet. Ask a Sunday School leader." });
+    expect(res.body).toEqual({
+      error:
+        "Your account isn't on the Sunday School schedule yet. Ask a Sunday School leader to add you.",
+    });
   });
 
   it("returns a generic 500 and logs the reason when DynamoDB fails", async () => {

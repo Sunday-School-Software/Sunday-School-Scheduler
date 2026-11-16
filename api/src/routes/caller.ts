@@ -39,7 +39,10 @@ export function requireCaller(
     }
 
     if (!person) {
-      res.status(403).json({ error: "Your account isn't set up yet. Ask a Sunday School leader." });
+      res.status(403).json({
+        error:
+          "Your account isn't on the Sunday School schedule yet. Ask a Sunday School leader to add you.",
+      });
       return;
     }
 
