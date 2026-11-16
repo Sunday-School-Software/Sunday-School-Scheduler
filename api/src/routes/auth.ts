@@ -2,14 +2,14 @@ import { Router, type Request } from "express";
 import { InvalidCredentialsError, InvalidTokenError, type AuthService } from "../services/auth.js";
 
 // The token from an `Authorization: Bearer <token>` header.
-function bearerToken(req: Request): string | undefined {
+export function bearerToken(req: Request): string | undefined {
   const match = /^Bearer (\S+)$/i.exec(req.get("authorization")?.trim() ?? "");
   return match?.[1];
 }
 
 // Logs only the error's message. Never log the request: it holds the password
 // or the token.
-function logFailure(action: string, err: unknown): void {
+export function logFailure(action: string, err: unknown): void {
   const message = err instanceof Error ? err.message || err.name : String(err);
   console.error(`${action} failed: ${message}`);
 }

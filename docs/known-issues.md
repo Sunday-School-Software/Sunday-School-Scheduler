@@ -43,6 +43,13 @@ These are temporary on purpose. Don't build on them as if they were the real thi
 - **Workaround:** follow the [setup guide](setup.md).
 - **Tracked in:** [#30] (Milestone 2).
 
+### Signing out doesn't stop a copied token from working
+
+- **What happens:** after `POST /api/logout`, Cognito rejects the access token, but the API checks tokens itself, against the pool's signing keys, without asking Cognito. So the API accepts the token until it expires: up to 1 hour in AWS, or 24 hours in cognito-local.
+- **When it bites:** only if someone copied the token before the user signed out.
+- **Workaround:** none needed for the demo or the pilot. Asking Cognito on every request would end the session at once, but it makes every request slower and counts against Cognito's request limits.
+- **Tracked in:** [#77].
+
 ## Open bugs
 
 None yet.
@@ -55,3 +62,4 @@ None yet.
 [#47]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/47
 [#48]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/48
 [#69]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/69
+[#77]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/77
