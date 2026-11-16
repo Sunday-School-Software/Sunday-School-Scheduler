@@ -1,6 +1,8 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { LoginPresenter, type LoginView } from "../../presenter/LoginPresenter.ts";
+import ErrorMessage from "../error/ErrorMessage.tsx";
+import { useErrorMessage } from "../error/ErrorMessageHooks.ts";
 import { useSessionActions } from "../session/SessionHooks.ts";
 
 interface Props {
@@ -14,7 +16,7 @@ export default function Login(props: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { errorMessage, displayErrorMessage, clearErrorMessage } = useErrorMessage();
 
   const navigate = useNavigate();
   const { setSession } = useSessionActions();
@@ -23,7 +25,7 @@ export default function Login(props: Props) {
     setIsLoading,
     setSession,
     navigate: (url) => void navigate(url),
-    displayErrorMessage: setErrorMessage,
+    displayErrorMessage,
   };
 
   const presenterRef = useRef<LoginPresenter | null>(null);
@@ -36,7 +38,7 @@ export default function Login(props: Props) {
     if (isLoading) {
       return;
     }
-    setErrorMessage(null);
+    clearErrorMessage();
     void presenterRef.current!.doLogin(email, password);
   };
 
@@ -79,11 +81,7 @@ export default function Login(props: Props) {
             className={inputClass}
           />
         </div>
-        {errorMessage && (
-          <p id="login-error" role="alert" className="text-red-700 dark:text-red-400">
-            {errorMessage}
-          </p>
-        )}
+        <ErrorMessage id="login-error" message={errorMessage} />
         <button
           type="submit"
           aria-disabled={isLoading}

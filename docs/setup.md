@@ -121,7 +121,7 @@ The dev server forwards every `/api` request to the API at http://localhost:3000
 
 The UI uses the Model-View-Presenter pattern, so the code that talks to the API can be tested without rendering anything:
 
-- **Views** are the React components in `web/src/components/`. They hold only view logic: state for what's on screen, and what to call when the user does something. Each one creates its presenter and hands it a view object, the functions the presenter may call, such as `displayErrorMessage()` or `navigate()`.
+- **Views** are the React components in `web/src/components/`. They hold only view logic: state for what's on screen, and what to call when the user does something. Each one creates its presenter and hands it a view object, the functions the presenter may call, such as `displayErrorMessage()` or `navigate()`. Pages show errors with `ErrorMessage` and keep the message in its `useErrorMessage()` hook, both in `web/src/components/error/`; each page sets the message's spacing with `className`.
 - **Presenters** in `web/src/presenter/` decide what happens: they call a service, then tell the view what to show. Presenters for signed-in screens extend `SignedInPresenter`, which sends the user back to the sign-in screen when the API rejects their token with 401.
 - **Services** in `web/src/model/service/` call the API through `ServerFacade` in `web/src/network/`, the only code that calls `fetch`.
 

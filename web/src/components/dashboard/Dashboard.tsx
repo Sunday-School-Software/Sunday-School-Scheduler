@@ -1,6 +1,8 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { useNavigate } from "react-router";
 import { DashboardPresenter, type DashboardView } from "../../presenter/DashboardPresenter.ts";
+import ErrorMessage from "../error/ErrorMessage.tsx";
+import { useErrorMessage } from "../error/ErrorMessageHooks.ts";
 import { useSession, useSessionActions } from "../session/SessionHooks.ts";
 
 interface Props {
@@ -9,14 +11,14 @@ interface Props {
 
 // A scaffold. The teacher's assignments come in #40.
 export default function Dashboard(props: Props) {
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { errorMessage, displayErrorMessage } = useErrorMessage();
 
   const navigate = useNavigate();
   const { token } = useSession();
   const { clearSession } = useSessionActions();
 
   const listener: DashboardView = {
-    displayErrorMessage: setErrorMessage,
+    displayErrorMessage,
     clearSession,
     navigateToLogin: () => void navigate("/login"),
   };
@@ -43,11 +45,7 @@ export default function Dashboard(props: Props) {
       <main className="mx-auto max-w-2xl px-4 py-8">
         <h1 className="text-2xl font-bold">Your assignments</h1>
         <p className="mt-2">Your classes for the next 4 Sundays will show here.</p>
-        {errorMessage && (
-          <p role="alert" className="mt-4 text-red-700 dark:text-red-400">
-            {errorMessage}
-          </p>
-        )}
+        <ErrorMessage message={errorMessage} className="mt-4" />
       </main>
     </>
   );
