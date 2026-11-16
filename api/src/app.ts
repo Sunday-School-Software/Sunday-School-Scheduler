@@ -1,14 +1,17 @@
 import express from "express";
+import { assignmentsRouter } from "./routes/assignments.js";
 import { authRouter } from "./routes/auth.js";
 import { requireCaller } from "./routes/caller.js";
 import { bodyErrorHandler } from "./routes/errors.js";
 import { healthRouter } from "./routes/health.js";
 import type { AuthService } from "./services/auth.js";
+import type { ClassService } from "./services/classes.js";
 import type { UserService } from "./services/users.js";
 
 export interface Services {
   auth: AuthService;
   users: UserService;
+  classes: ClassService;
 }
 
 // Builds the Express app without starting a server, so tests can use it directly.
@@ -23,6 +26,7 @@ export function createApp(services: Services) {
   // Every /api route mounted after this needs a signed-in caller, and can read
   // their Person with callerOf(req).
   app.use("/api", requireCaller(services.auth, services.users));
+  app.use("/api/assignments", assignmentsRouter(services.classes));
 
   app.use(bodyErrorHandler);
 

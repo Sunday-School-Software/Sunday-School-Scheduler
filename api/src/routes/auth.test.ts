@@ -12,6 +12,7 @@ import { mockClient } from "aws-sdk-client-mock";
 import request from "supertest";
 import { createApp } from "../app.js";
 import { createAuthService } from "../services/auth.js";
+import { createClassService } from "../services/classes.js";
 import { createUserService } from "../services/users.js";
 
 const PASSWORD = "Secret-password-1";
@@ -22,6 +23,7 @@ const env = { COGNITO_USER_POOL_ID: "pool-1", COGNITO_CLIENT_ID: "client-1", AWS
 const app = createApp({
   auth: createAuthService(new CognitoIdentityProviderClient({ region: "local" }), env),
   users: createUserService(new DynamoDBClient({ region: "local" }), {}),
+  classes: createClassService(new DynamoDBClient({ region: "local" }), {}),
 });
 
 const consoleSpies = (["log", "info", "warn", "error"] as const).map((method) =>

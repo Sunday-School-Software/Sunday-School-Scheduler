@@ -4,6 +4,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import request from "supertest";
 import { createApp } from "../app.js";
 import { createAuthService } from "../services/auth.js";
+import { createClassService } from "../services/classes.js";
 import { createUserService } from "../services/users.js";
 
 describe("GET /api/health", () => {
@@ -12,6 +13,7 @@ describe("GET /api/health", () => {
     const app = createApp({
       auth: createAuthService(new CognitoIdentityProviderClient({}), {}),
       users: createUserService(new DynamoDBClient({}), {}),
+      classes: createClassService(new DynamoDBClient({}), {}),
     });
     const res = await request(app).get("/api/health");
 

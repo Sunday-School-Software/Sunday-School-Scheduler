@@ -12,6 +12,7 @@ import request from "supertest";
 import { createApp } from "../app.js";
 import { SEED_TEACHERS, seedItems } from "../db/seed.js";
 import { createAuthService } from "../services/auth.js";
+import { createClassService } from "../services/classes.js";
 import { createUserService } from "../services/users.js";
 import {
   accessClaims,
@@ -33,6 +34,7 @@ const mockCognito = mockClient(CognitoIdentityProviderClient);
 const app = createApp({
   auth: createAuthService(new CognitoIdentityProviderClient({ region: "local" }), cognitoEnv, jwksFetcher([key])),
   users: createUserService(new DynamoDBClient({ region: "local" }), { DYNAMODB_TABLE: "test-table" }),
+  classes: createClassService(new DynamoDBClient({ region: "local" }), { DYNAMODB_TABLE: "test-table" }),
 });
 // A protected route, mounted after createApp() like the routes in #37 and #38.
 app.get("/api/test/caller", (req, res) => {
@@ -172,6 +174,7 @@ describe("requireCaller", () => {
         fetch: () => Promise.reject(new Error("getaddrinfo ENOTFOUND cognito-idp.us-east-1.amazonaws.com")),
       }),
       users: createUserService(new DynamoDBClient({ region: "local" }), { DYNAMODB_TABLE: "test-table" }),
+      classes: createClassService(new DynamoDBClient({ region: "local" }), { DYNAMODB_TABLE: "test-table" }),
     });
 
     const res = await request(offline).get("/api/anything").set("Authorization", `Bearer ${TOKEN}`);
@@ -197,7 +200,7 @@ describe("which routes need a signed-in caller", () => {
   });
 
   it("protects every other /api route, even one that doesn't exist", async () => {
-    const res = await request(app).get("/api/assignments");
+    const res = await request(app).get("/api/no-such-route");
 
     expect(res.status).toBe(401);
     expect(res.body).toEqual(notSignedIn);
