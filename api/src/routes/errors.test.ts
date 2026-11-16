@@ -1,14 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import request from "supertest";
 import { createApp } from "../app.js";
 import { createAuthService } from "../services/auth.js";
+import { createUserService } from "../services/users.js";
 
 const PASSWORD = "Secret-password-1";
 
 // Express's default error handler logs nothing in its "test" environment, which
 // Jest sets, so use "development" to check that nothing is logged.
-const app = createApp({ auth: createAuthService(new CognitoIdentityProviderClient({}), {}) });
+const app = createApp({
+  auth: createAuthService(new CognitoIdentityProviderClient({}), {}),
+  users: createUserService(new DynamoDBClient({}), {}),
+});
 app.set("env", "development");
 
 const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});

@@ -7,10 +7,12 @@ import {
   NotAuthorizedException,
   UserNotFoundException,
 } from "@aws-sdk/client-cognito-identity-provider";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
 import request from "supertest";
 import { createApp } from "../app.js";
 import { createAuthService } from "../services/auth.js";
+import { createUserService } from "../services/users.js";
 
 const PASSWORD = "Secret-password-1";
 const TOKEN = "access-token-123";
@@ -19,6 +21,7 @@ const mockCognito = mockClient(CognitoIdentityProviderClient);
 const env = { COGNITO_USER_POOL_ID: "pool-1", COGNITO_CLIENT_ID: "client-1", AWS_REGION: "us-east-1" };
 const app = createApp({
   auth: createAuthService(new CognitoIdentityProviderClient({ region: "local" }), env),
+  users: createUserService(new DynamoDBClient({ region: "local" }), {}),
 });
 
 const consoleSpies = (["log", "info", "warn", "error"] as const).map((method) =>
