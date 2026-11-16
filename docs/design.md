@@ -21,6 +21,7 @@ Details for each revision are in the commit messages (`git log docs/design.md`).
 | 2026-11-06 | Hyrum Kammerman | Matched the milestones to the repo's GitHub milestones; admin and broadcast moved beyond December |
 | 2026-11-09 | Hyrum Kammerman | Linked the DynamoDB key design ([data-model.md](data-model.md)) from §5, §6 and §7 |
 | 2026-11-16 | Hyrum Kammerman | Renamed `findByUser()` to `findByUserId()` to match the code |
+| 2026-11-16 | Hyrum Kammerman | §4: the UI follows the Model-View-Presenter pattern |
 
 ---
 
