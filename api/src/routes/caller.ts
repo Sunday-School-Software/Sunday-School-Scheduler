@@ -14,7 +14,10 @@ declare module "express-serve-static-core" {
 // verify(jwt) gives the user_id, and findByUser(user_id) the Person and role.
 // A missing or bad token gets 401. A good token for an account that isn't
 // linked to a Person gets 403.
-export function requireCaller(auth: AuthService, users: UserService): RequestHandler {
+export function requireCaller(
+  authService: AuthService,
+  userService: UserService,
+): RequestHandler {
   return async (req, res, next) => {
     const token = bearerToken(req);
     if (!token) {
@@ -24,7 +27,7 @@ export function requireCaller(auth: AuthService, users: UserService): RequestHan
 
     let person;
     try {
-      person = await users.findByUser(await auth.verify(token));
+      person = await userService.findByUser(await authService.verify(token));
     } catch (err) {
       if (err instanceof InvalidTokenError) {
         res.status(401).json({ error: "You're not signed in." });
