@@ -45,6 +45,22 @@ describe("ServerFacade", () => {
       expect(error).toHaveProperty("message", "Wrong email or password.");
     });
 
+    it("throws the API's message for other client errors", async () => {
+      mockFetch(400, { error: "Enter your email and password." });
+
+      await expect(facade.login("teacher@example.com", "")).rejects.toThrow(
+        new ApiError("Enter your email and password."),
+      );
+    });
+
+    it("throws the generic message for a server error, even when the API sends one", async () => {
+      mockFetch(500, { error: "Couldn't sign in. Please try again." });
+
+      await expect(facade.login("teacher@example.com", "Secret-1")).rejects.toThrow(
+        new ApiError(GENERIC_ERROR_MESSAGE),
+      );
+    });
+
     it("throws the generic message when the response has no error message", async () => {
       mockFetch(502);
 
@@ -87,13 +103,14 @@ describe("ServerFacade", () => {
       await expect(facade.logout("token-123")).rejects.toThrow(UnauthorizedError);
     });
 
-    it("throws ApiError for other failures", async () => {
+    it("throws ApiError with the generic message for a server error", async () => {
       mockFetch(500, { error: "Couldn't sign out. Please try again." });
 
       const error = await facade.logout("token-123").catch((e: unknown) => e);
 
+      expect(error).toBeInstanceOf(ApiError);
       expect(error).not.toBeInstanceOf(UnauthorizedError);
-      expect(error).toHaveProperty("message", "Couldn't sign out. Please try again.");
+      expect(error).toHaveProperty("message", GENERIC_ERROR_MESSAGE);
     });
   });
 });

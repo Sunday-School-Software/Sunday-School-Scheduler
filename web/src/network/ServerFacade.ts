@@ -25,10 +25,11 @@ export class ServerFacade {
     await this.post("/api/logout", {}, token);
   }
 
-  // Throws ApiError with the API's message, or a generic one if the request
-  // failed without one. A 401 for a request that sent a token throws
-  // UnauthorizedError. Login's 401 means a wrong password, not an expired
-  // session, so it stays an ApiError.
+  // Throws ApiError with the API's message for a 4xx, which says what the user
+  // can fix. A 5xx, a 4xx without a message, or no response gets the generic
+  // message, so server problems aren't described to the user. A 401 for a
+  // request that sent a token throws UnauthorizedError. Login's 401 means a
+  // wrong password, not an expired session, so it stays an ApiError.
   private async post(path: string, body: unknown, token?: string): Promise<unknown> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (token) {
@@ -47,7 +48,7 @@ export class ServerFacade {
       return responseBody;
     }
 
-    const message = errorMessageFrom(responseBody);
+    const message = response.status < 500 ? errorMessageFrom(responseBody) : undefined;
     if (response.status === 401 && token) {
       throw new UnauthorizedError(message);
     }
