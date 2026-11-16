@@ -21,6 +21,7 @@ Details for each revision are in the commit messages (`git log docs/design.md`).
 | 2026-11-06 | Hyrum Kammerman | Matched the milestones to the repo's GitHub milestones; admin and broadcast moved beyond December |
 | 2026-11-09 | Hyrum Kammerman | Linked the DynamoDB key design ([data-model.md](data-model.md)) from §5, §6 and §7 |
 | 2026-11-16 | Hyrum Kammerman | Renamed `findByUser()` to `findByUserId()` to match the code |
+| 2026-11-16 | Hyrum Kammerman | §4: the UI follows the Model-View-Presenter pattern |
 
 ---
 
@@ -87,6 +88,8 @@ The UI runs in the browser. Everything else is one Node (TypeScript) process on 
 | User Service | Creates people, links and finds accounts and roles| DB | `create(name, email?)`, `linkAccount(user_id, email)`, `findByUserId(user_id)` → Person, `listLeaders()` → emails |
 | Class Service | Classes, assignments and responses | DB | `createClass()`, `assign(class, person)`, `reassign(class, from, to)`, `listAssignments(person, dates)`, `listSchedule(dates)`, `update(class, person, status)` |
 | Email Service | Sends notification emails. | SES | `email(addresses, message)` → OK/error |
+
+**Inside the UI.** The UI follows the Model-View-Presenter pattern. React components hold only view logic, presenters call the API through services and tell the components what to show, and one `ServerFacade` makes every API call. The [setup guide](setup.md#how-the-ui-is-organized) describes the folders.
 
 **Who can do what.** A teacher sees and responds to only their own assignments; anything else returns 403. A leader can also create classes and people, assign and reassign teachers, record responses for anyone, and see the full schedule. An admin manages accounts and roles (beyond December; see §8).
 

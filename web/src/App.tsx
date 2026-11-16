@@ -1,52 +1,30 @@
-import { useEffect, useState } from "react";
+import { Navigate, Route, Routes } from "react-router";
+import Dashboard from "./components/dashboard/Dashboard.tsx";
+import Login from "./components/login/Login.tsx";
+import { useSession } from "./components/session/SessionHooks.ts";
 
-type Health =
-  | { state: "loading" }
-  | { state: "ok"; body: unknown }
-  | { state: "error"; message: string };
-
-// Placeholder page: checks that the UI can reach the API through /api.
+// Signed-out visitors can only reach the login screen, and signed-in users
+// can't reach it. Clearing the session switches the routes, so any page a
+// signed-out visitor opens sends them to /login.
 export default function App() {
-  const [health, setHealth] = useState<Health>({ state: "loading" });
+  const { token } = useSession();
+  return token ? <SignedInRoutes /> : <SignedOutRoutes />;
+}
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    fetch("/api/health", { signal: controller.signal })
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        setHealth({ state: "ok", body: await res.json() });
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setHealth({
-          state: "error",
-          message: err instanceof Error ? err.message : String(err),
-        });
-      });
-
-    return () => controller.abort();
-  }, []);
-
+function SignedInRoutes() {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="text-3xl font-bold">Sunday School Scheduler</h1>
-      <h2 className="mt-6 text-xl font-semibold">API health</h2>
-      {health.state === "loading" && <p className="mt-2">Checking…</p>}
-      {health.state === "ok" && (
-        <pre className="mt-2 rounded-md bg-gray-100 p-3 font-mono text-sm dark:bg-gray-800">
-          {JSON.stringify(health.body, null, 2)}
-        </pre>
-      )}
-      {health.state === "error" && (
-        <p role="alert" className="mt-2 text-red-700 dark:text-red-400">
-          Couldn't reach the API ({health.message}). Is it running?
-        </p>
-      )}
-    </main>
+    <Routes>
+      <Route index element={<Dashboard />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+function SignedOutRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   );
 }

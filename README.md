@@ -21,7 +21,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. The page shows the API's health check, `"status": "ok"`. See the [setup guide](docs/setup.md) for running the tests and everything else.
+Open http://localhost:5173 to see the sign-in screen. Signing in needs the AWS settings and seed data in the [setup guide](docs/setup.md), which also covers running the tests and everything else.
 
 ## Contributing
 Looking to become a contributor? See the [contributing guide](CONTRIBUTING.md) for guidance on where to start.
