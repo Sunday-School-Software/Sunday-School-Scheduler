@@ -1,4 +1,5 @@
 import type { Request, RequestHandler } from "express";
+import { DatabaseUnavailableError } from "../db/client.js";
 import { InvalidTokenError, type AuthService } from "../services/auth.js";
 import type { Person, UserService } from "../services/users.js";
 import { bearerToken, logFailure } from "./auth.js";
@@ -13,7 +14,8 @@ declare module "express-serve-static-core" {
 // Identifies the caller of every route mounted after it (design §4, step 2):
 // verify(jwt) gives the user_id, and findByUserId(user_id) the Person and role.
 // A missing or bad token gets 401. A good token for an account that isn't
-// linked to a Person gets 403.
+// linked to a Person gets 403. DynamoDB being unreachable gets 503, and any
+// other failure 500.
 export function requireCaller(
   authService: AuthService,
   userService: UserService,
@@ -34,7 +36,9 @@ export function requireCaller(
         return;
       }
       logFailure("Identifying the caller", err);
-      res.status(500).json({ error: "Something went wrong. Please try again." });
+      res
+        .status(err instanceof DatabaseUnavailableError ? 503 : 500)
+        .json({ error: "Something went wrong. Please try again." });
       return;
     }
 

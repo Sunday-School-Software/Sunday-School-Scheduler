@@ -1,5 +1,5 @@
 import { QueryCommand, type AttributeValue, type DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { errorMessage, tableNameFrom } from "../db/client.js";
+import { databaseError, tableNameFrom } from "../db/client.js";
 
 type Env = Record<string, string | undefined>;
 
@@ -58,7 +58,7 @@ export function createUserService(client: DynamoDBClient, env: Env = process.env
           }),
         );
       } catch (err) {
-        throw new Error(errorMessage(err, env), { cause: err });
+        throw databaseError(err, env);
       }
 
       const items = result.Items ?? [];

@@ -3,9 +3,11 @@ import {
   DynamoDBClient,
   InternalServerError,
   QueryCommand,
+  ResourceNotFoundException,
   type AttributeValue,
 } from "@aws-sdk/client-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
+import { DatabaseUnavailableError } from "../db/client.js";
 import { SEED_TEACHERS, seedItems } from "../db/seed.js";
 import { createUserService } from "./users.js";
 
@@ -80,12 +82,24 @@ describe("findByUserId", () => {
     );
   });
 
-  it("rethrows DynamoDB errors with their message", async () => {
+  it("throws DatabaseUnavailableError, with the message, when DynamoDB fails", async () => {
     mockDb
       .on(QueryCommand)
       .rejects(new InternalServerError({ message: "DynamoDB is down.", $metadata: {} }));
 
-    await expect(users.findByUserId(USER_ID)).rejects.toThrow("DynamoDB is down.");
+    const err = await users.findByUserId(USER_ID).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DatabaseUnavailableError);
+    expect(err).toHaveProperty("message", "DynamoDB is down.");
+  });
+
+  it("throws a plain Error when the table doesn't exist, since retrying won't help", async () => {
+    mockDb
+      .on(QueryCommand)
+      .rejects(new ResourceNotFoundException({ message: "Requested resource not found", $metadata: {} }));
+
+    const err = await users.findByUserId(USER_ID).catch((e: unknown) => e);
+    expect(err).not.toBeInstanceOf(DatabaseUnavailableError);
+    expect(err).toHaveProperty("message", "Requested resource not found");
   });
 
   it("says DynamoDB Local isn't running when the connection is refused", async () => {

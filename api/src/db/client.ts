@@ -45,3 +45,45 @@ export function errorMessage(err: unknown, env: Env = process.env): string {
   }
   return String(err);
 }
+
+// DynamoDB couldn't be reached, or answered that it can't serve the request
+// right now. Retrying later should work, so the API answers 503.
+export class DatabaseUnavailableError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "DatabaseUnavailableError";
+  }
+}
+
+// Node's error codes when no answer came back. The SDK names its own timeouts
+// TimeoutError.
+const NETWORK_CODES = new Set(["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN"]);
+// DynamoDB marks throttling as a client fault, but waiting and retrying fixes it.
+const THROTTLING_NAMES = new Set([
+  "ProvisionedThroughputExceededException",
+  "ThrottlingException",
+  "RequestLimitExceeded",
+]);
+
+function isUnavailable(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) {
+    return false;
+  }
+  const { code, name, $fault } = err as { code?: unknown; name?: unknown; $fault?: unknown };
+  return (
+    (typeof code === "string" && NETWORK_CODES.has(code)) ||
+    name === "TimeoutError" ||
+    (typeof name === "string" && THROTTLING_NAMES.has(name)) ||
+    $fault === "server"
+  );
+}
+
+// Wraps an error from a DynamoDB call. It's a DatabaseUnavailableError when
+// retrying could work, and a plain Error for a mistake in the code or the
+// setup, such as a missing table, which retrying won't fix.
+export function databaseError(err: unknown, env: Env = process.env): Error {
+  const message = errorMessage(err, env);
+  return isUnavailable(err)
+    ? new DatabaseUnavailableError(message, { cause: err })
+    : new Error(message, { cause: err });
+}

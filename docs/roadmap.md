@@ -29,8 +29,8 @@ Deployment moved from Milestone 1 to Milestone 2, but it's still part of the MVP
 
 - **What a user loses:** "the next 4 Sundays" is really today plus 28 days, using the server's date. A class can show up a day early or late. When today is a Sunday, the window can include a fifth Sunday.
 - **Why it was cut:** time. Cut from [#37](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/37).
-- **What it needs first:** [#37](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/37) merged, and a decision on which time zone to use. #37 asks for the date math to live in its own function, so the fix should be small and easy to test.
-- **How to help:** once #37 is merged, open an issue proposing the time zone, then fix the date function and add tests for a Sunday and for late Saturday night.
+- **What it needs first:** a decision on which time zone to use. The date math lives in its own function, `assignmentWindow()` in `api/src/dates.ts`, so the fix should be small and easy to test.
+- **How to help:** comment on [#79](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/79) to propose the time zone setting, then fix the date function and add tests for a Sunday and for late Saturday night.
 
 ### 3. Specific error messages (Idea)
 

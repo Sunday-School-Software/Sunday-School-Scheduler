@@ -22,6 +22,7 @@ Details for each revision are in the commit messages (`git log docs/design.md`).
 | 2026-11-09 | Hyrum Kammerman | Linked the DynamoDB key design ([data-model.md](data-model.md)) from §5, §6 and §7 |
 | 2026-11-16 | Hyrum Kammerman | Renamed `findByUser()` to `findByUserId()` to match the code |
 | 2026-11-16 | Hyrum Kammerman | §4: the UI follows the Model-View-Presenter pattern |
+| 2026-11-16 | Hyrum Kammerman | §4: `listAssignments()` takes a `person_id`, to match the code |
 
 ---
 
@@ -86,7 +87,7 @@ The UI runs in the browser. Everything else is one Node (TypeScript) process on 
 | API | Verifies caller, checks their role, calls services, and sends notifications. | UI and the four services | HTTP routes returning JSON and status codes (200, 403, 500) |
 | Auth Service | Signs users up and in through Cognito and verifies JWTs | Cognito | `register()`, `login()`, `logout()` → JWT; `verify(jwt)` → user_id |
 | User Service | Creates people, links and finds accounts and roles| DB | `create(name, email?)`, `linkAccount(user_id, email)`, `findByUserId(user_id)` → Person, `listLeaders()` → emails |
-| Class Service | Classes, assignments and responses | DB | `createClass()`, `assign(class, person)`, `reassign(class, from, to)`, `listAssignments(person, dates)`, `listSchedule(dates)`, `update(class, person, status)` |
+| Class Service | Classes, assignments and responses | DB | `createClass()`, `assign(class, person)`, `reassign(class, from, to)`, `listAssignments(person_id, dates)`, `listSchedule(dates)`, `update(class, person, status)` |
 | Email Service | Sends notification emails. | SES | `email(addresses, message)` → OK/error |
 
 **Inside the UI.** The UI follows the Model-View-Presenter pattern. React components hold only view logic, presenters call the API through services and tell the components what to show, and one `ServerFacade` makes every API call. The [setup guide](setup.md#how-the-ui-is-organized) describes the folders.
@@ -133,7 +134,7 @@ One EC2 instance, in the same AWS account as Cognito, DynamoDB and SES, runs Cad
 
 1. The signed-in teacher opens the dashboard.
 2. UI → API `GET /assignments`. The API identifies the caller with `verify(jwt)` → user_id and `findByUserId(user_id)` → Person and role.
-3. API → Class Service `listAssignments(person, next 4 Sundays)`. The UI renders the dashboard.
+3. API → Class Service `listAssignments(person_id, next 4 Sundays)`. The UI renders the dashboard.
 4. The teacher clicks **Confirm**. UI → API `PUT /assignments/{class}`. The API identifies the caller again and checks that the assignment is theirs (or that they're a leader).
 5. API → Class Service `update(class, person, status)`, a conditional write that returns OK.
 6. API → User Service `listLeaders()`, then Email Service `email(addresses, message)` through SES.
@@ -167,7 +168,7 @@ sequenceDiagram
     User->>+DB: get Person
     DB-->>-User: Person
     User-->>-API: Person, role
-    API->>+Class: listAssignments(person, next 4 Sundays)
+    API->>+Class: listAssignments(person_id, next 4 Sundays)
     Class->>+DB: query
     DB-->>-Class: assignments
     Class-->>-API: assignments

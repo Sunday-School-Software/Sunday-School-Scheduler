@@ -4,6 +4,7 @@ import {
   DynamoDBClient,
   InternalServerError,
   QueryCommand,
+  ResourceNotFoundException,
 } from "@aws-sdk/client-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
 import type { Request } from "express";
@@ -11,6 +12,7 @@ import request from "supertest";
 import { createApp } from "../app.js";
 import { SEED_TEACHERS, seedItems } from "../db/seed.js";
 import { createAuthService } from "../services/auth.js";
+import { createClassService } from "../services/classes.js";
 import { createUserService } from "../services/users.js";
 import {
   accessClaims,
@@ -32,6 +34,7 @@ const mockCognito = mockClient(CognitoIdentityProviderClient);
 const app = createApp({
   auth: createAuthService(new CognitoIdentityProviderClient({ region: "local" }), cognitoEnv, jwksFetcher([key])),
   users: createUserService(new DynamoDBClient({ region: "local" }), { DYNAMODB_TABLE: "test-table" }),
+  classes: createClassService(new DynamoDBClient({ region: "local" }), { DYNAMODB_TABLE: "test-table" }),
 });
 // A protected route, mounted after createApp() like the routes in #37 and #38.
 app.get("/api/test/caller", (req, res) => {
@@ -133,16 +136,36 @@ describe("requireCaller", () => {
     });
   });
 
-  it("returns a generic 500 and logs the reason when DynamoDB fails", async () => {
+  it("returns 503 and logs the reason when DynamoDB is down", async () => {
     mockDb
       .on(QueryCommand)
       .rejects(new InternalServerError({ message: "DynamoDB is down.", $metadata: {} }));
 
     const res = await getCaller(TOKEN);
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
     expect(res.body).toEqual({ error: "Something went wrong. Please try again." });
     expect(logged()).toEqual(["Identifying the caller failed: DynamoDB is down."]);
+  });
+
+  it("returns 503 when the connection to DynamoDB is refused", async () => {
+    mockDb.on(QueryCommand).rejects(Object.assign(new AggregateError([], ""), { code: "ECONNREFUSED" }));
+
+    const res = await getCaller(TOKEN);
+
+    expect(res.status).toBe(503);
+  });
+
+  it("returns a generic 500 for a DynamoDB error that retrying won't fix", async () => {
+    mockDb
+      .on(QueryCommand)
+      .rejects(new ResourceNotFoundException({ message: "Requested resource not found", $metadata: {} }));
+
+    const res = await getCaller(TOKEN);
+
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: "Something went wrong. Please try again." });
+    expect(logged()).toEqual(["Identifying the caller failed: Requested resource not found"]);
   });
 
   it("returns a generic 500 when the pool's signing keys can't be downloaded", async () => {
@@ -151,6 +174,7 @@ describe("requireCaller", () => {
         fetch: () => Promise.reject(new Error("getaddrinfo ENOTFOUND cognito-idp.us-east-1.amazonaws.com")),
       }),
       users: createUserService(new DynamoDBClient({ region: "local" }), { DYNAMODB_TABLE: "test-table" }),
+      classes: createClassService(new DynamoDBClient({ region: "local" }), { DYNAMODB_TABLE: "test-table" }),
     });
 
     const res = await request(offline).get("/api/anything").set("Authorization", `Bearer ${TOKEN}`);
@@ -176,7 +200,7 @@ describe("which routes need a signed-in caller", () => {
   });
 
   it("protects every other /api route, even one that doesn't exist", async () => {
-    const res = await request(app).get("/api/assignments");
+    const res = await request(app).get("/api/no-such-route");
 
     expect(res.status).toBe(401);
     expect(res.body).toEqual(notSignedIn);

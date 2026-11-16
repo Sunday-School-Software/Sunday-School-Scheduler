@@ -4,6 +4,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import request from "supertest";
 import { createApp } from "../app.js";
 import { createAuthService } from "../services/auth.js";
+import { createClassService } from "../services/classes.js";
 import { createUserService } from "../services/users.js";
 
 const PASSWORD = "Secret-password-1";
@@ -13,6 +14,7 @@ const PASSWORD = "Secret-password-1";
 const app = createApp({
   auth: createAuthService(new CognitoIdentityProviderClient({}), {}),
   users: createUserService(new DynamoDBClient({}), {}),
+  classes: createClassService(new DynamoDBClient({}), {}),
 });
 app.set("env", "development");
 

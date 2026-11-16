@@ -25,7 +25,7 @@ These are temporary on purpose. Don't build on them as if they were the real thi
 - **What happens:** the dashboard shows assignments from today through 28 days from today, using the server's clock. Near midnight, a class can show up a day early or late, and the window can include a fifth Sunday.
 - **When it bites:** near midnight, and whenever today is a Sunday (the window then includes today's Sunday plus the next four).
 - **Workaround:** none needed for the demo or the pilot.
-- **Tracked in:** [#37], with time zones on the [roadmap](roadmap.md).
+- **Tracked in:** [#79], with time zones on the [roadmap](roadmap.md).
 
 ### Every failure shows the same error message
 
@@ -56,10 +56,10 @@ None yet.
 
 [#30]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/30
 [#34]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/34
-[#37]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/37
 [#40]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/40
 [#41]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/41
 [#47]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/47
 [#48]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/48
 [#69]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/69
 [#77]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/77
+[#79]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/79
