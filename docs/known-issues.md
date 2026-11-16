@@ -48,7 +48,7 @@ These are temporary on purpose. Don't build on them as if they were the real thi
 - **What happens:** after `POST /api/logout`, Cognito rejects the access token, but the API checks tokens itself, against the pool's signing keys, without asking Cognito. So the API accepts the token until it expires: up to 1 hour in AWS, or 24 hours in cognito-local.
 - **When it bites:** only if someone copied the token before the user signed out.
 - **Workaround:** none needed for the demo or the pilot. Asking Cognito on every request would end the session at once, but it makes every request slower and counts against Cognito's request limits.
-- **Tracked in:** [#36] (checking the token on each request).
+- **Tracked in:** [#77].
 
 ## Open bugs
 
@@ -56,10 +56,10 @@ None yet.
 
 [#30]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/30
 [#34]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/34
-[#36]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/36
 [#37]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/37
 [#40]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/40
 [#41]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/41
 [#47]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/47
 [#48]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/48
 [#69]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/69
+[#77]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/77
