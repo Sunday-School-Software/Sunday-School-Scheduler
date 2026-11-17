@@ -23,6 +23,7 @@ Details for each revision are in the commit messages (`git log docs/design.md`).
 | 2026-11-16 | Hyrum Kammerman | Renamed `findByUser()` to `findByUserId()` to match the code |
 | 2026-11-16 | Hyrum Kammerman | §4: the UI follows the Model-View-Presenter pattern |
 | 2026-11-16 | Hyrum Kammerman | §4: `listAssignments()` takes a `person_id`, to match the code |
+| 2026-11-16 | Hyrum Kammerman | §4: the API row lists every status code the routes return (400, 401 and 503 were missing) |
 
 ---
 
@@ -84,7 +85,7 @@ The UI runs in the browser. Everything else is one Node (TypeScript) process on 
 | Component | Responsibility | Talks to | Interface (rough) |
 |---|---|---|---|
 | UI | Sign-in, teacher dashboard, leader schedule, teacher actions, and messages. | API | HTTPS JSON with the JWT, e.g. `POST /login`, `GET /assignments`, `PUT /assignments/{class}` |
-| API | Verifies caller, checks their role, calls services, and sends notifications. | UI and the four services | HTTP routes returning JSON and status codes (200, 403, 500) |
+| API | Verifies caller, checks their role, calls services, and sends notifications. | UI and the four services | HTTP routes returning JSON and status codes (200, 400, 401, 403, 500, 503) |
 | Auth Service | Signs users up and in through Cognito and verifies JWTs | Cognito | `register()`, `login()`, `logout()` → JWT; `verify(jwt)` → user_id |
 | User Service | Creates people, links and finds accounts and roles| DB | `create(name, email?)`, `linkAccount(user_id, email)`, `findByUserId(user_id)` → Person, `listLeaders()` → emails |
 | Class Service | Classes, assignments and responses | DB | `createClass()`, `assign(class, person)`, `reassign(class, from, to)`, `listAssignments(person_id, dates)`, `listSchedule(dates)`, `update(class, person, status)` |
