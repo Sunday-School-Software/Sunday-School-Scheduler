@@ -9,16 +9,23 @@ import SessionProvider from "./components/session/SessionProvider.tsx";
 const originalFetch = globalThis.fetch;
 
 // jsdom has no fetch (or Response), so every test that renders a component
-// that calls the API must mock it. Build responses as plain objects.
-function mockFetch(status: number, body: unknown) {
-  const fetchMock = jest.fn<typeof fetch>().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: () => Promise.resolve(body),
-  } as Response);
+// that calls the API must mock it. Build responses as plain objects. Each
+// path gets its own [status, body], and the dashboard loads assignments as
+// soon as it opens, so tests that reach it answer /api/assignments.
+function mockFetch(responses: Record<string, [number, unknown]>) {
+  const fetchMock = jest.fn<typeof fetch>((input) => {
+    const [status, body] = (typeof input === "string" && responses[input]) || [404, {}];
+    return Promise.resolve({
+      ok: status >= 200 && status < 300,
+      status,
+      json: () => Promise.resolve(body),
+    } as Response);
+  });
   globalThis.fetch = fetchMock;
   return fetchMock;
 }
+
+const NO_ASSIGNMENTS: [number, unknown] = [200, { assignments: [] }];
 
 function renderApp(path: string) {
   render(
@@ -54,7 +61,10 @@ describe("App", () => {
   });
 
   it("opens the dashboard after a successful sign-in", async () => {
-    const fetchMock = mockFetch(200, { accessToken: "token-123" });
+    const fetchMock = mockFetch({
+      "/api/login": [200, { accessToken: "token-123" }],
+      "/api/assignments": NO_ASSIGNMENTS,
+    });
     const user = renderApp("/login");
 
     await signIn(user, "Secret-1");
@@ -65,7 +75,7 @@ describe("App", () => {
   });
 
   it("shows an error and keeps the email after a failed sign-in", async () => {
-    mockFetch(401, { error: "Wrong email or password." });
+    mockFetch({ "/api/login": [401, { error: "Wrong email or password." }] });
     const user = renderApp("/login");
 
     await signIn(user, "wrong");
@@ -76,17 +86,32 @@ describe("App", () => {
     expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
   });
 
-  it("keeps a signed-in user on the dashboard when they reload or open /login", () => {
+  it("keeps a signed-in user on the dashboard when they reload or open /login", async () => {
     sessionStorage.setItem(TOKEN_KEY, "token-123");
+    mockFetch({ "/api/assignments": NO_ASSIGNMENTS });
 
     renderApp("/login");
 
     expect(screen.getByRole("heading", { name: "Your assignments" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("You have no assignments in the next 4 Sundays."),
+    ).toBeInTheDocument();
+  });
+
+  it("returns to the login screen when the API rejects the token while loading assignments", async () => {
+    sessionStorage.setItem(TOKEN_KEY, "expired-token");
+    mockFetch({ "/api/assignments": [401, { error: "You're not signed in." }] });
+
+    renderApp("/");
+
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
   });
 
   it("signs out, clears the token and returns to the login screen", async () => {
     sessionStorage.setItem(TOKEN_KEY, "token-123");
-    const fetchMock = mockFetch(200, {});
+    const fetchMock = mockFetch({ "/api/logout": [200, {}], "/api/assignments": NO_ASSIGNMENTS });
     const user = renderApp("/");
 
     await user.click(screen.getByRole("button", { name: "Sign out" }));
