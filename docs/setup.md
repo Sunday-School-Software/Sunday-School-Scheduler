@@ -364,7 +364,18 @@ You need the [table](#create-the-dynamodb-table) and the [user pool](#create-the
 
    **Checkpoint:** the command prints an `accessToken`. `{"error":"Wrong email or password."}` means the password doesn't match the last `npm run seed`, or the API is using another pool. Check `COGNITO_USER_POOL_ID` and `COGNITO_CLIENT_ID` in `api/.env`.
 
-   Sign in as `teacher.b@example.com` to try changing Teacher A's assignments.
+   Then confirm an assignment with that token. `GET /api/assignments` lists the class IDs; Teacher A's first seeded class is `5eed0000-0000-4000-8000-0000000001a1`. Put the `accessToken` in place of `<token>`:
+
+   ```sh
+   curl -X PUT -H 'Authorization: Bearer <token>' -H 'Content-Type: application/json' \
+     -d '{"status":"confirmed"}' \
+     http://localhost:3000/api/assignments/5eed0000-0000-4000-8000-0000000001a1
+   # {"assignment":{"classId":"5eed0000-0000-4000-8000-0000000001a1","className":"Gospel Doctrine","date":"2026-11-15","status":"confirmed"}}
+   ```
+
+   **Checkpoint:** the command prints the assignment with `"status":"confirmed"`. `{"status":"substitute requested"}` requests a substitute instead, and sending the same status again gives the same answer. Any other status gets `400`.
+
+   Sign in as `teacher.b@example.com` to try changing Teacher A's assignments: the same command with Teacher B's token prints `{"error":"You're not assigned to that class."}` (403), and Teacher A's assignment doesn't change.
 
 4. Sign in from the browser. Start the UI (see [Run the UI locally](#run-the-ui-locally)), open http://localhost:5173 and sign in as `teacher.a@example.com` with your `SEED_PASSWORD`.
 
@@ -387,5 +398,5 @@ The seed data is made up. Never put real ward members' names or email addresses 
 - **`POST /api/login` or `POST /api/logout` answers `Couldn't sign in` or `Couldn't sign out`.** Look at the terminal where the API is running. It prints `Login failed:` or `Logout failed:` and the reason, without the password or token. If it says to set `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID` or `AWS_REGION`, add them to `api/.env` (see [Where the IDs go](#where-the-ids-go)) and restart the API. Sign-out always fails against cognito-local (see [In cognito-local](#in-cognito-local)).
 - **A route answers `{"error":"You're not signed in."}` (401).** The request has no `Authorization: Bearer <accessToken>` header, or the token is expired (after 1 hour), changed, or from another pool or app client. Sign in again with `POST /api/login` and use the new token. With cognito-local, check that `COGNITO_ENDPOINT` uses the port cognito-local listens on, since the API expects that port in the token's issuer.
 - **A route answers `{"error":"Your account isn't on the Sunday School schedule yet. Ask a Sunday School leader to add you."}` (403).** The token is fine, but no Person in the table has that user's ID. Usually `DYNAMODB_TABLE` and `COGNITO_USER_POOL_ID` are for different environments, or the table was emptied after `npm run seed`. Run `npm run seed` again against the same table and pool.
-- **A route answers `{"error":"Something went wrong. Please try again."}` (500 or 503).** Look at the terminal where the API is running. It prints what failed, such as `Identifying the caller failed:` or `Listing assignments failed:`, and the reason. A 503 means DynamoDB couldn't be reached, usually because DynamoDB Local isn't running. A 500 is anything else, such as cognito-local not running, the table not existing, or `DYNAMODB_TABLE` not set.
+- **A route answers `{"error":"Something went wrong. Please try again."}` (500 or 503).** Look at the terminal where the API is running. It prints what failed, such as `Identifying the caller failed:`, `Listing assignments failed:` or `Updating an assignment failed:`, and the reason. A 503 means DynamoDB couldn't be reached, usually because DynamoDB Local isn't running. A 500 is anything else, such as cognito-local not running, the table not existing, or `DYNAMODB_TABLE` not set.
 - **`npm start` or `npm run preview` cannot find `dist/`.** Both run the compiled build. Run `npm run build` in the same project first.

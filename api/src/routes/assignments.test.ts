@@ -1,12 +1,15 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
 import {
+  ConditionalCheckFailedException,
   DynamoDBClient,
   InternalServerError,
   QueryCommand,
   ResourceNotFoundException,
+  UpdateItemCommand,
   type AttributeValue,
   type QueryCommandInput,
+  type UpdateItemCommandInput,
 } from "@aws-sdk/client-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
 import type { Express } from "express";
@@ -93,6 +96,12 @@ const getAssignments = () => request(app).get("/api/assignments").set("Authoriza
 
 const somethingWentWrong = { error: "Something went wrong. Please try again." };
 
+// The table's items for the PUT tests, so they can check what was written.
+// Keyed by `${pk} ${sk}`.
+let table = new Map<string, Record<string, AttributeValue>>();
+const keyOf = (item: Record<string, AttributeValue>) => `${item.pk?.S} ${item.sk?.S}`;
+const assignmentIn = (classId: string, personId: string) => table.get(`CLASS#${classId} ASSIGN#${personId}`);
+
 beforeEach(() => {
   mockDb.reset();
   // The caller is Teacher A.
@@ -101,6 +110,23 @@ beforeEach(() => {
   mockDb.on(QueryCommand, { IndexName: "GSI1" }).callsFake((input: QueryCommandInput) => {
     const pk = input.ExpressionAttributeValues?.[":pk"]?.S;
     return { Items: items.filter((item: Record<string, AttributeValue>) => item.gsi1pk?.S === pk) };
+  });
+  // Like DynamoDB with attribute_exists(pk): update the item if it's there,
+  // and otherwise reject without writing anything.
+  table = new Map(items.map((item) => [keyOf(item), { ...item }]));
+  mockDb.on(UpdateItemCommand).callsFake((input: UpdateItemCommandInput) => {
+    const key = `${input.Key?.pk?.S} ${input.Key?.sk?.S}`;
+    const existing = table.get(key);
+    if (input.ConditionExpression !== "attribute_exists(pk)" || !existing) {
+      throw new ConditionalCheckFailedException({ message: "The conditional request failed", $metadata: {} });
+    }
+    const saved = {
+      ...existing,
+      status: input.ExpressionAttributeValues![":status"]!,
+      updated_at: input.ExpressionAttributeValues![":now"]!,
+    };
+    table.set(key, saved);
+    return { Attributes: saved };
   });
   consoleSpies.forEach((spy) => spy.mockClear());
 });
@@ -212,6 +238,153 @@ describe("GET /api/assignments", () => {
 
   it("returns 401 without a token, before reading any assignments", async () => {
     const res = await request(app).get("/api/assignments");
+
+    expect(res.status).toBe(401);
+    expect(mockDb.calls()).toHaveLength(0);
+  });
+});
+
+describe("PUT /api/assignments/:classId", () => {
+  const ownClass = teacherA.classIds[0]!;
+  const otherClass = teacherB.classIds[0]!;
+
+  const putStatus = (classId: string, body: object | undefined) => {
+    const req = request(app).put(`/api/assignments/${classId}`).set("Authorization", `Bearer ${token}`);
+    return body === undefined ? req : req.send(body);
+  };
+
+  const updates = () => mockDb.commandCalls(UpdateItemCommand);
+  const tableBefore = () => new Map([...table].map(([key, item]) => [key, { ...item }]));
+
+  it("confirms the caller's own assignment and returns it", async () => {
+    const res = await putStatus(ownClass, { status: "confirmed" });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      assignment: { classId: ownClass, className: teacherA.className, date: sundays[0], status: "confirmed" },
+    });
+    expect(assignmentIn(ownClass, teacherA.personId)?.status).toEqual({ S: "confirmed" });
+    expect(assignmentIn(ownClass, teacherA.personId)?.updated_at).toEqual({ S: TODAY.toISOString() });
+  });
+
+  it("requests a substitute", async () => {
+    const res = await putStatus(ownClass, { status: "substitute requested" });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { assignment: { status: string } }).assignment.status).toBe("substitute requested");
+    expect(assignmentIn(ownClass, teacherA.personId)?.status).toEqual({ S: "substitute requested" });
+  });
+
+  it("lets the caller change their answer", async () => {
+    await putStatus(ownClass, { status: "substitute requested" });
+    const res = await putStatus(ownClass, { status: "confirmed" });
+
+    expect(res.status).toBe(200);
+    expect(assignmentIn(ownClass, teacherA.personId)?.status).toEqual({ S: "confirmed" });
+  });
+
+  it("is safe to send twice", async () => {
+    const first = await putStatus(ownClass, { status: "confirmed" });
+    const second = await putStatus(ownClass, { status: "confirmed" });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(second.body).toEqual(first.body);
+    expect(assignmentIn(ownClass, teacherA.personId)?.status).toEqual({ S: "confirmed" });
+    expect(table.size).toBe(items.length);
+  });
+
+  it("saves the canonical status after trimming and lowercasing it", async () => {
+    const res = await putStatus(ownClass, { status: "  Substitute Requested " });
+
+    expect(res.status).toBe(200);
+    expect(assignmentIn(ownClass, teacherA.personId)?.status).toEqual({ S: "substitute requested" });
+  });
+
+  it("returns 403 and changes nothing for another teacher's assignment", async () => {
+    const before = tableBefore();
+
+    const res = await putStatus(otherClass, { status: "confirmed" });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ error: "You're not assigned to that class." });
+    // It asked for the caller's own assignment to that class, which doesn't exist.
+    expect(updates()[0]?.args[0].input.Key).toEqual({
+      pk: { S: `CLASS#${otherClass}` },
+      sk: { S: `ASSIGN#${teacherA.personId}` },
+    });
+    expect(table).toEqual(before);
+  });
+
+  it("returns 403 for a class that doesn't exist", async () => {
+    const before = tableBefore();
+
+    const res = await putStatus("not-a-class", { status: "confirmed" });
+
+    expect(res.status).toBe(403);
+    expect(table).toEqual(before);
+  });
+
+  it("ignores a person ID in the body", async () => {
+    const res = await putStatus(otherClass, { status: "confirmed", personId: teacherB.personId });
+
+    expect(res.status).toBe(403);
+    expect(updates()[0]?.args[0].input.Key?.sk).toEqual({ S: `ASSIGN#${teacherA.personId}` });
+    expect(assignmentIn(otherClass, teacherB.personId)?.status).toEqual({ S: "pending" });
+  });
+
+  it.each([
+    ["pending", { status: "pending" }],
+    ["an unknown status", { status: "maybe" }],
+    ["a status with extra inner spaces", { status: "substitute  requested" }],
+    ["a status that isn't a string", { status: 1 }],
+    ["no status", {}],
+    ["no body", undefined],
+  ])("returns 400 without writing for %s", async (_name, body) => {
+    const res = await putStatus(ownClass, body);
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'Status must be "confirmed" or "substitute requested".' });
+    expect(updates()).toHaveLength(0);
+  });
+
+  it("returns 503 and logs the reason when DynamoDB is down for the write", async () => {
+    mockDb
+      .on(UpdateItemCommand)
+      .rejects(new InternalServerError({ message: "DynamoDB is down.", $metadata: {} }));
+    const before = tableBefore();
+
+    const res = await putStatus(ownClass, { status: "confirmed" });
+
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual(somethingWentWrong);
+    expect(logged()).toEqual(["Updating an assignment failed: DynamoDB is down."]);
+    expect(table).toEqual(before);
+  });
+
+  it("returns 503 without writing when DynamoDB is down before the caller is identified", async () => {
+    mockDb.on(QueryCommand).rejects(Object.assign(new AggregateError([], ""), { code: "ECONNREFUSED" }));
+
+    const res = await putStatus(ownClass, { status: "confirmed" });
+
+    expect(res.status).toBe(503);
+    expect(updates()).toHaveLength(0);
+  });
+
+  it("returns a generic 500 for a DynamoDB error that retrying won't fix", async () => {
+    mockDb
+      .on(UpdateItemCommand)
+      .rejects(new ResourceNotFoundException({ message: "Requested resource not found", $metadata: {} }));
+
+    const res = await putStatus(ownClass, { status: "confirmed" });
+
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual(somethingWentWrong);
+    expect(logged()).toEqual(["Updating an assignment failed: Requested resource not found"]);
+  });
+
+  it("returns 401 without a token, before touching DynamoDB", async () => {
+    const res = await request(app).put(`/api/assignments/${ownClass}`).send({ status: "confirmed" });
 
     expect(res.status).toBe(401);
     expect(mockDb.calls()).toHaveLength(0);
