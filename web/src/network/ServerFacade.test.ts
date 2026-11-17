@@ -138,6 +138,16 @@ describe("ServerFacade", () => {
       });
     });
 
+    it("accepts the last day of a year and a leap day", async () => {
+      const dates = [
+        { ...assignments[0]!, date: "2026-12-31" },
+        { ...assignments[0]!, classId: "c4", date: "2028-02-29" },
+      ];
+      mockFetch(200, { assignments: dates });
+
+      await expect(facade.listAssignments("token-123")).resolves.toEqual(dates);
+    });
+
     it("returns an empty list", async () => {
       mockFetch(200, { assignments: [] });
 
@@ -150,6 +160,9 @@ describe("ServerFacade", () => {
       ["has a status the UI doesn't know", { assignments: [{ ...assignments[0], status: "maybe" }] }],
       ["has an assignment without a class name", { assignments: [{ ...assignments[0], className: "" }] }],
       ["has a date that isn't YYYY-MM-DD", { assignments: [{ ...assignments[0], date: "Nov 22" }] }],
+      ["has a month that doesn't exist", { assignments: [{ ...assignments[0], date: "2026-13-01" }] }],
+      ["has a day the month doesn't have", { assignments: [{ ...assignments[0], date: "2026-02-30" }] }],
+      ["has a day past the 31st", { assignments: [{ ...assignments[0], date: "2026-11-32" }] }],
       ["has one bad assignment among good ones", { assignments: [...assignments, null] }],
     ])("throws the generic message when the response %s", async (_, body) => {
       mockFetch(200, body);

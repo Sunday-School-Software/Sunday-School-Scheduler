@@ -15,6 +15,17 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value !== "";
 }
 
+// A real YYYY-MM-DD day, so formatDate() can show it. Date.parse rejects
+// "2026-13-01" but rolls "2026-02-30" over to March 2, so the date must also
+// come back unchanged.
+function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const time = Date.parse(`${value}T00:00:00Z`);
+  return !Number.isNaN(time) && new Date(time).toISOString().startsWith(value);
+}
+
 function isAssignment(value: unknown): value is Assignment {
   if (typeof value !== "object" || value === null) {
     return false;
@@ -23,8 +34,7 @@ function isAssignment(value: unknown): value is Assignment {
   return (
     isNonEmptyString(item.classId) &&
     isNonEmptyString(item.className) &&
-    typeof item.date === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(item.date) &&
+    isCalendarDate(item.date) &&
     STATUSES.includes(item.status as Status)
   );
 }
