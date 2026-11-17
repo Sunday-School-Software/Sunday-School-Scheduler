@@ -1,4 +1,10 @@
-import { paginateQuery, type AttributeValue, type DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  ConditionalCheckFailedException,
+  paginateQuery,
+  UpdateItemCommand,
+  type AttributeValue,
+  type DynamoDBClient,
+} from "@aws-sdk/client-dynamodb";
 import type { DateWindow } from "../dates.js";
 import { databaseError, tableNameFrom } from "../db/client.js";
 
@@ -6,6 +12,14 @@ type Env = Record<string, string | undefined>;
 
 export const STATUSES = ["pending", "confirmed", "substitute requested"] as const;
 export type Status = (typeof STATUSES)[number];
+
+// The statuses a teacher can answer with. Nobody can set an assignment back to pending.
+export const RESPONSE_STATUSES = ["confirmed", "substitute requested"] as const satisfies readonly Status[];
+export type ResponseStatus = (typeof RESPONSE_STATUSES)[number];
+
+export function isResponseStatus(value: unknown): value is ResponseStatus {
+  return RESPONSE_STATUSES.includes(value as ResponseStatus);
+}
 
 // One person's assignment to teach one class (design §5).
 export interface Assignment {
@@ -19,6 +33,9 @@ export interface Assignment {
 export interface ClassService {
   // The person's assignments dated within `dates`, soonest first.
   listAssignments(personId: string, dates: DateWindow): Promise<Assignment[]>;
+  // Sets the status of the person's assignment to the class and returns the
+  // saved assignment, or undefined if the person isn't assigned to it.
+  update(classId: string, personId: string, status: ResponseStatus): Promise<Assignment | undefined>;
 }
 
 function isStatus(value: unknown): value is Status {
@@ -72,6 +89,42 @@ export function createClassService(client: DynamoDBClient, env: Env = process.en
       }
 
       return items.map(assignmentFrom);
+    },
+
+    // Access pattern 3 in docs/data-model.md ("The conditional write").
+    async update(classId, personId, status) {
+      let item: Record<string, AttributeValue> | undefined;
+      try {
+        ({ Attributes: item } = await client.send(
+          new UpdateItemCommand({
+            TableName: tableNameFrom(env),
+            Key: { pk: { S: `CLASS#${classId}` }, sk: { S: `ASSIGN#${personId}` } },
+            UpdateExpression: "SET #status = :status, updated_at = :now",
+            // The permission check: the item exists only if this person is
+            // assigned to this class. Without it, UpdateItem would create one.
+            ConditionExpression: "attribute_exists(pk)",
+            // status is a reserved word in DynamoDB expressions.
+            ExpressionAttributeNames: { "#status": "status" },
+            ExpressionAttributeValues: {
+              ":status": { S: status },
+              ":now": { S: new Date().toISOString() },
+            },
+            // The saved item, so the caller doesn't have to read it back from
+            // GSI1, which can briefly show the old status.
+            ReturnValues: "ALL_NEW",
+          }),
+        ));
+      } catch (err) {
+        if (err instanceof ConditionalCheckFailedException) {
+          return undefined;
+        }
+        throw databaseError(err, env);
+      }
+
+      if (!item) {
+        throw new Error(`UpdateItem returned no attributes for CLASS#${classId} ASSIGN#${personId}.`);
+      }
+      return assignmentFrom(item);
     },
   };
 }

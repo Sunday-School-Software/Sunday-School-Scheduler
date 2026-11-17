@@ -106,13 +106,17 @@ Confirming a lesson or requesting a substitute (pattern 3) is one UpdateItem:
 Key:                 { pk: "CLASS#<class_id>", sk: "ASSIGN#<person_id>" }
 UpdateExpression:    SET #status = :status, updated_at = :now
 ConditionExpression: attribute_exists(pk)
+ReturnValues:        ALL_NEW
 ```
 
 - `person_id` is always the caller's own, from the verified JWT and `findByUserId()`. It never comes from the request.
 - **The condition is the permission check.** The assignment exists only if this person is assigned to this class. If they aren't, or a leader has just reassigned the class to someone else, DynamoDB rejects the write with `ConditionalCheckFailedException`, nothing changes, and the API returns 403 ([#38]).
 - **Without the condition**, UpdateItem would create the item if it didn't exist, so a teacher could assign themselves to any class, or bring back an assignment a leader had just removed.
 - Sending the same status twice succeeds both times and leaves the same result, so a retry after an error is safe.
-- The API checks that `status` is `confirmed` or `substitute requested` before the write (400 otherwise).
+- The API trims and lowercases `status`, then checks that it's `confirmed` or `substitute requested` before the write (400 otherwise). It saves that canonical spelling.
+- `ReturnValues: ALL_NEW` returns the saved item, and the API sends it back as the response. Reading it from `GSI1` instead could briefly show the old status, since indexes are eventually consistent (see [Limits](#limits)).
+- `#status` stands in for `status` because `status` is a reserved word in DynamoDB expressions.
+- The condition doesn't look at the date, so a past assignment can still be changed.
 
 ## Copied fields
 
