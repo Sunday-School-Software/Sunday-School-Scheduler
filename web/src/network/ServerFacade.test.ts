@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
+import type { Assignment } from "../model/Assignment.ts";
 import { ApiError, GENERIC_ERROR_MESSAGE, UnauthorizedError } from "../model/errors.ts";
 import { ServerFacade } from "./ServerFacade.ts";
 
@@ -111,6 +112,77 @@ describe("ServerFacade", () => {
       expect(error).toBeInstanceOf(ApiError);
       expect(error).not.toBeInstanceOf(UnauthorizedError);
       expect(error).toHaveProperty("message", GENERIC_ERROR_MESSAGE);
+    });
+  });
+
+  describe("listAssignments", () => {
+    const assignments: Assignment[] = [
+      { classId: "c1", className: "Gospel Doctrine", date: "2026-11-22", status: "pending" },
+      { classId: "c2", className: "Youth Sunday School", date: "2026-11-29", status: "confirmed" },
+      {
+        classId: "c3",
+        className: "Gospel Doctrine",
+        date: "2026-12-06",
+        status: "substitute requested",
+      },
+    ];
+
+    it("gets the assignments with the token as a Bearer token and no body", async () => {
+      const fetchMock = mockFetch(200, { assignments });
+
+      await expect(facade.listAssignments("token-123")).resolves.toEqual(assignments);
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/assignments", {
+        method: "GET",
+        headers: { Authorization: "Bearer token-123" },
+      });
+    });
+
+    it("returns an empty list", async () => {
+      mockFetch(200, { assignments: [] });
+
+      await expect(facade.listAssignments("token-123")).resolves.toEqual([]);
+    });
+
+    it.each([
+      ["has no assignments field", {}],
+      ["has assignments that aren't a list", { assignments: "none" }],
+      ["has a status the UI doesn't know", { assignments: [{ ...assignments[0], status: "maybe" }] }],
+      ["has an assignment without a class name", { assignments: [{ ...assignments[0], className: "" }] }],
+      ["has a date that isn't YYYY-MM-DD", { assignments: [{ ...assignments[0], date: "Nov 22" }] }],
+      ["has one bad assignment among good ones", { assignments: [...assignments, null] }],
+    ])("throws the generic message when the response %s", async (_, body) => {
+      mockFetch(200, body);
+
+      await expect(facade.listAssignments("token-123")).rejects.toThrow(
+        new ApiError(GENERIC_ERROR_MESSAGE),
+      );
+    });
+
+    it("throws UnauthorizedError when the API rejects the token", async () => {
+      mockFetch(401, { error: "You're not signed in." });
+
+      await expect(facade.listAssignments("token-123")).rejects.toThrow(UnauthorizedError);
+    });
+
+    it("throws the API's message when the account isn't on the schedule", async () => {
+      const message =
+        "Your account isn't on the Sunday School schedule yet. Ask a Sunday School leader to add you.";
+      mockFetch(403, { error: message });
+
+      const error = await facade.listAssignments("token-123").catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).not.toBeInstanceOf(UnauthorizedError);
+      expect(error).toHaveProperty("message", message);
+    });
+
+    it("throws the generic message, not the API's, when the database is down", async () => {
+      mockFetch(503, { error: "DynamoDB couldn't be reached." });
+
+      await expect(facade.listAssignments("token-123")).rejects.toThrow(
+        new ApiError(GENERIC_ERROR_MESSAGE),
+      );
     });
   });
 });

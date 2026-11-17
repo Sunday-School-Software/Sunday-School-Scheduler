@@ -1,3 +1,4 @@
+import { STATUSES, type Assignment, type Status } from "../model/Assignment.ts";
 import { ApiError, UnauthorizedError } from "../model/errors.ts";
 
 // The `error` field the API puts in every failed response, if there is one.
@@ -10,10 +11,28 @@ function errorMessageFrom(body: unknown): string | undefined {
   return undefined;
 }
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value !== "";
+}
+
+function isAssignment(value: unknown): value is Assignment {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const item = value as Record<string, unknown>;
+  return (
+    isNonEmptyString(item.classId) &&
+    isNonEmptyString(item.className) &&
+    typeof item.date === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(item.date) &&
+    STATUSES.includes(item.status as Status)
+  );
+}
+
 // The only place the UI calls the API.
 export class ServerFacade {
   public async login(email: string, password: string): Promise<string> {
-    const body = await this.post("/api/login", { email, password });
+    const body = await this.request("POST", "/api/login", { body: { email, password } });
     const accessToken = (body as { accessToken?: unknown } | undefined)?.accessToken;
     if (typeof accessToken !== "string" || !accessToken) {
       throw new ApiError();
@@ -22,7 +41,18 @@ export class ServerFacade {
   }
 
   public async logout(token: string): Promise<void> {
-    await this.post("/api/logout", {}, token);
+    await this.request("POST", "/api/logout", { body: {}, token });
+  }
+
+  // Throws ApiError if any assignment is malformed, rather than leaving it
+  // out, so a teacher never misses a class without being told something's wrong.
+  public async listAssignments(token: string): Promise<Assignment[]> {
+    const body = await this.request("GET", "/api/assignments", { token });
+    const assignments = (body as { assignments?: unknown } | undefined)?.assignments;
+    if (!Array.isArray(assignments) || !assignments.every(isAssignment)) {
+      throw new ApiError();
+    }
+    return assignments;
   }
 
   // Throws ApiError with the API's message for a 4xx, which says what the user
@@ -30,15 +60,26 @@ export class ServerFacade {
   // message, so server problems aren't described to the user. A 401 for a
   // request that sent a token throws UnauthorizedError. Login's 401 means a
   // wrong password, not an expired session, so it stays an ApiError.
-  private async post(path: string, body: unknown, token?: string): Promise<unknown> {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
+  private async request(
+    method: "GET" | "POST",
+    path: string,
+    { body, token }: { body?: unknown; token?: string },
+  ): Promise<unknown> {
+    const headers: Record<string, string> = {};
+    if (body !== undefined) {
+      headers["Content-Type"] = "application/json";
+    }
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
 
     let response: Response;
     try {
-      response = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
+      response = await fetch(path, {
+        method,
+        headers,
+        ...(body !== undefined && { body: JSON.stringify(body) }),
+      });
     } catch {
       throw new ApiError();
     }
