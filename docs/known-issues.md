@@ -32,7 +32,7 @@ These are temporary on purpose. Don't build on them as if they were the real thi
 - **What happens:** any failed request (a server error or no response) shows "Something went wrong. Please try again.", whatever the cause.
 - **When it bites:** when the database or the network is down.
 - **Workaround:** try again. Saving the same status twice is safe.
-- **Tracked in:** [#40] and [#41].
+- **Tracked in:** the [roadmap](roadmap.md#3-specific-error-messages-idea). The generic message came from [#40] and [#41].
 
 ## Deliberate cuts
 

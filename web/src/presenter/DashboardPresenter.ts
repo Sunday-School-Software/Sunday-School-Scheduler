@@ -1,4 +1,5 @@
-import type { Assignment } from "../model/Assignment.ts";
+import { formatDate } from "../dates.ts";
+import { STATUS_LABELS, type Assignment, type ResponseStatus } from "../model/Assignment.ts";
 import { AuthService } from "../model/service/AuthService.ts";
 import { ClassService } from "../model/service/ClassService.ts";
 import { SignedInPresenter, type SignedInView } from "./Presenter.ts";
@@ -6,6 +7,11 @@ import { SignedInPresenter, type SignedInView } from "./Presenter.ts";
 export interface DashboardView extends SignedInView {
   setIsLoading: (isLoading: boolean) => void;
   setAssignments: (assignments: Assignment[]) => void;
+  setIsSaving: (classId: string, isSaving: boolean) => void;
+  // Replaces the shown assignment that has the same classId.
+  updateAssignment: (assignment: Assignment) => void;
+  displaySuccessMessage: (message: string) => void;
+  clearMessages: () => void;
 }
 
 export class DashboardPresenter extends SignedInPresenter<DashboardView> {
@@ -31,6 +37,23 @@ export class DashboardPresenter extends SignedInPresenter<DashboardView> {
         this.view.setAssignments(await this.classService.listAssignments(token));
       },
       () => this.view.setIsLoading(false),
+    );
+  }
+
+  // Confirms the class or requests a substitute. If the save fails, the
+  // assignment on screen keeps its old status.
+  public async respond(token: string, classId: string, status: ResponseStatus) {
+    this.view.clearMessages();
+    this.view.setIsSaving(classId, true);
+    await this.doFailureReportingOperation(
+      async () => {
+        const saved = await this.classService.updateAssignment(token, classId, status);
+        this.view.updateAssignment(saved);
+        this.view.displaySuccessMessage(
+          `${saved.className} on ${formatDate(saved.date)} is now marked ${STATUS_LABELS[saved.status]}.`,
+        );
+      },
+      () => this.view.setIsSaving(classId, false),
     );
   }
 

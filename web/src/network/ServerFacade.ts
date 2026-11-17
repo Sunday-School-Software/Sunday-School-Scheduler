@@ -1,4 +1,4 @@
-import { STATUSES, type Assignment, type Status } from "../model/Assignment.ts";
+import { STATUSES, type Assignment, type ResponseStatus, type Status } from "../model/Assignment.ts";
 import { ApiError, UnauthorizedError } from "../model/errors.ts";
 
 // The `error` field the API puts in every failed response, if there is one.
@@ -65,13 +65,30 @@ export class ServerFacade {
     return assignments;
   }
 
+  // Returns the assignment as the API saved it.
+  public async updateAssignment(
+    token: string,
+    classId: string,
+    status: ResponseStatus,
+  ): Promise<Assignment> {
+    const body = await this.request("PUT", `/api/assignments/${encodeURIComponent(classId)}`, {
+      body: { status },
+      token,
+    });
+    const assignment = (body as { assignment?: unknown } | undefined)?.assignment;
+    if (!isAssignment(assignment)) {
+      throw new ApiError();
+    }
+    return assignment;
+  }
+
   // Throws ApiError with the API's message for a 4xx, which says what the user
   // can fix. A 5xx, a 4xx without a message, or no response gets the generic
   // message, so server problems aren't described to the user. A 401 for a
   // request that sent a token throws UnauthorizedError. Login's 401 means a
   // wrong password, not an expired session, so it stays an ApiError.
   private async request(
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PUT",
     path: string,
     { body, token }: { body?: unknown; token?: string },
   ): Promise<unknown> {

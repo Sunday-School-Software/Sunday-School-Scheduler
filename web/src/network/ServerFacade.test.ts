@@ -198,4 +198,82 @@ describe("ServerFacade", () => {
       );
     });
   });
+
+  describe("updateAssignment", () => {
+    const saved: Assignment = {
+      classId: "c1",
+      className: "Gospel Doctrine",
+      date: "2026-11-22",
+      status: "confirmed",
+    };
+
+    it("puts the status with the token and returns the saved assignment", async () => {
+      const fetchMock = mockFetch(200, { assignment: saved });
+
+      await expect(facade.updateAssignment("token-123", "c1", "confirmed")).resolves.toEqual(saved);
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/assignments/c1", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer token-123" },
+        body: JSON.stringify({ status: "confirmed" }),
+      });
+    });
+
+    it("sends a substitute request", async () => {
+      const fetchMock = mockFetch(200, { assignment: { ...saved, status: "substitute requested" } });
+
+      await facade.updateAssignment("token-123", "c1", "substitute requested");
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/assignments/c1",
+        expect.objectContaining({ body: JSON.stringify({ status: "substitute requested" }) }),
+      );
+    });
+
+    it("encodes the class ID so it stays one path segment", async () => {
+      const fetchMock = mockFetch(200, { assignment: saved });
+
+      await facade.updateAssignment("token-123", "../logout?x=1", "confirmed");
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/assignments/..%2Flogout%3Fx%3D1", expect.anything());
+    });
+
+    it.each([
+      ["has no assignment field", {}],
+      ["has an assignment with a status the UI doesn't know", { assignment: { ...saved, status: "maybe" } }],
+      ["has an assignment without a class ID", { assignment: { ...saved, classId: "" } }],
+    ])("throws the generic message when the response %s", async (_, body) => {
+      mockFetch(200, body);
+
+      await expect(facade.updateAssignment("token-123", "c1", "confirmed")).rejects.toThrow(
+        new ApiError(GENERIC_ERROR_MESSAGE),
+      );
+    });
+
+    it("throws the API's message when the class isn't the caller's", async () => {
+      mockFetch(403, { error: "You're not assigned to that class." });
+
+      const error = await facade.updateAssignment("token-123", "c1", "confirmed").catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).not.toBeInstanceOf(UnauthorizedError);
+      expect(error).toHaveProperty("message", "You're not assigned to that class.");
+    });
+
+    it("throws UnauthorizedError when the API rejects the token", async () => {
+      mockFetch(401, { error: "You're not signed in." });
+
+      await expect(facade.updateAssignment("token-123", "c1", "confirmed")).rejects.toThrow(
+        UnauthorizedError,
+      );
+    });
+
+    it("throws the generic message when the database is down", async () => {
+      mockFetch(503, { error: "Something went wrong. Please try again." });
+
+      await expect(facade.updateAssignment("token-123", "c1", "confirmed")).rejects.toThrow(
+        new ApiError(GENERIC_ERROR_MESSAGE),
+      );
+    });
+  });
 });
