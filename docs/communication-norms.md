@@ -1,4 +1,6 @@
 # Communication Norms
+## Who maintains the project
+The maintainer is Hyrum (GitHub handle hkamm123).
 
 ## Where to communicate
 
@@ -13,7 +15,7 @@ If something gets decided outside GitHub (over email or in person), post a short
 
 ## Response times
 
-Expect a reply to issues, pull requests, and comments within 1 week, and to security or Code of Conduct reports within 72 hours (fixes may take longer).
+Expect a reply to issues, pull requests, and comments within 1 week, and to security or Code of Conduct reports within 72 hours (fixes may take longer). When new issues are created, they are given the "needs triage" label. The maintainer checks this label at least once per week.
 
 If a week goes by with no reply, comment again to bump the thread.
 
