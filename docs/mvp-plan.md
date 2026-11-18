@@ -22,6 +22,11 @@
 
 **Falsifier:** if the teacher can't finish alone in a minute or would rather text, sign-in is the wrong front door, and Milestone 2 moves email-link answers ahead of leader features.
 
+**Live teacher test**: I ran the test with a recently released Sunday School teacher. Here's what happened:
+- I pre-filled the email and password, and gave her two instructions: confirm your lesson on the 22nd and ask for a substitute on the 29th. She was able to sign in and do both tasks without hesitation in under 22 seconds.
+- I asked her, "Would you use this over responding to a text?" She responded yes because, although responding to a text might be a few seconds faster, this is more organized and easier for the leadership so it's better overall.
+- I asked her, "Would you be opposed to creating an account with your own email and password?" She said she would not be opposed to that.
+
 **Script:**
 1. Claim: a teacher answers in under a minute; here's what a real teacher did and said. Include their thoughts about actually using the app.
 2. Sign in, confirm one lesson, ask for a sub on another, refresh, show the DynamoDB row and the cost in Cost Explorer.
