@@ -52,7 +52,26 @@ These are temporary on purpose. Don't build on them as if they were the real thi
 
 ## Open bugs
 
-None yet.
+### `npm install` reports vulnerabilities
+
+- **What happens:** `npm install` reports 47 vulnerabilities in `api` and 51 in `web` (moderate and high).
+- **When it bites:** every install, when you follow the [setup guide](setup.md).
+- **Workaround:** safe to ignore for local development. All of them come from three file-matching libraries (picomatch, glob, minimatch) inside the development tools (Jest, ESLint, Vite). `npm audit --omit=dev` finds none in the packages the app runs with. Don't run `npm audit fix --force`: it makes breaking upgrades.
+- **Tracked in:** [#85].
+
+### The dashboard is cut off on narrow screens
+
+- **What happens:** on phone and small tablet widths, the right edge of the page (the Sign out link and the right side of each assignment card) is cut off.
+- **When it bites:** on a phone, or in a narrow browser window.
+- **Workaround:** scroll sideways.
+- **Tracked in:** [#86].
+
+### Keyboard focus is lost after answering
+
+- **What happens:** after you confirm or ask for a substitute with the keyboard, the button you pressed goes away and focus jumps to the top of the page.
+- **When it bites:** for keyboard and screen reader users, on every answer.
+- **Workaround:** press Tab to move back down to the card.
+- **Tracked in:** [#91].
 
 [#30]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/30
 [#34]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/34
@@ -63,3 +82,6 @@ None yet.
 [#69]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/69
 [#77]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/77
 [#79]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/79
+[#85]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/85
+[#86]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/86
+[#91]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/91
