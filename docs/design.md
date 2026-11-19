@@ -25,6 +25,7 @@ Details for each revision are in the commit messages (`git log docs/design.md`).
 | 2026-11-16 | Hyrum Kammerman | §4: `listAssignments()` takes a `person_id`, to match the code |
 | 2026-11-16 | Hyrum Kammerman | §4: the API row lists every status code the routes return (400, 401 and 503 were missing) |
 | 2026-11-18 | Hyrum Kammerman | Texts through AWS End User Messaging in a new Milestone 3, after the MVP: each person picks email or text (§2–§8) |
+| 2026-11-18 | Hyrum Kammerman | §4: Terraform creates the server, and shell access goes through Session Manager instead of SSH |
 
 ---
 
@@ -137,7 +138,7 @@ flowchart LR
 
 ### Hosting
 
-One EC2 instance, in the same AWS account as Cognito, DynamoDB and SES, runs Caddy in front of the Node process. Caddy serves the built UI bundle, provides HTTPS on the app's domain with automatic certificates, and forwards `/api` requests to Node. The instance's IAM role grants access to the app's tables, to SES, and (from Milestone 3) to sending texts from the app's number, so no AWS keys live in the code. The instance holds no data, so it can be rebuilt from the repository; scripting the setup is part of deployment in Milestone 2.
+One EC2 instance, in the same AWS account as Cognito, DynamoDB and SES, runs Caddy in front of the Node process. Caddy serves the built UI bundle, provides HTTPS on the app's domain with automatic certificates, and forwards `/api` requests to Node. The instance's IAM role grants access to the app's tables, to SES, and (from Milestone 3) to sending texts from the app's number, so no AWS keys live in the code. The instance holds no data, so it can be rebuilt from the repository. A Terraform config in `infra/` creates the instance, its role, its security group and its Elastic IP, and keeps its state in S3 so any maintainer can rebuild it; the [setup guide](setup.md#create-the-server) explains how. Only ports 80 and 443 are open. A maintainer gets a shell through AWS Systems Manager Session Manager, so there is no SSH port or key to protect, and besides the app's table (and SES and texts, once notifications are built), the role has only the few permissions Session Manager needs.
 
 ### Core flow, traced end to end
 

@@ -13,8 +13,9 @@ This guide takes you from a fresh clone to the app running on your machine. The 
 7. [Create the DynamoDB table](#create-the-dynamodb-table), in DynamoDB Local or in AWS
 8. [Create the Cognito user pool](#create-the-cognito-user-pool), in cognito-local or in AWS, and where the IDs go
 9. [Load the seed data](#load-the-seed-data), and which account to sign in with
-10. Deploy (not written yet): ship the app to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
-11. [When things go wrong](#when-things-go-wrong)
+10. [Create the server](#create-the-server), the EC2 instance the app runs on, with Terraform
+11. Deploy (not written yet): serve the app over HTTPS ([#43](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/43)), ship it to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
+12. [When things go wrong](#when-things-go-wrong)
 
 ## Before you start
 
@@ -153,6 +154,12 @@ Put a test next to the file it tests and name it `<file>.test.ts` (or `.test.tsx
 
 Import `describe`, `it`, `expect` and `jest` from `@jest/globals`, so TypeScript knows their types. Jest still sets them as globals too, and React Testing Library relies on that to clean up after each test, so don't turn the globals off. To run one file, or rerun tests when files change, pass Jest options after `--`, for example `npm test -- src/App.test.tsx` or `npm test -- --watch`.
 
+The Terraform config in `infra/` has its own tests, which check the server's network rules and its role's permissions against a fake AWS provider. They need [Terraform](https://developer.hashicorp.com/terraform/install) 1.10 or later, but no AWS account, and nothing is created:
+
+```sh
+(cd infra && terraform init -backend=false && terraform test)
+```
+
 CI runs these tests for you on every push and pull request (see [Continuous integration](#continuous-integration)).
 
 ## Continuous integration
@@ -163,12 +170,15 @@ GitHub Actions runs the checks for you on every push to any branch and on every 
 |---|---|---|
 | API CI | `.github/workflows/api.yml` | `api/`, or the workflow file itself |
 | Web CI | `.github/workflows/web.yml` | `web/`, or the workflow file itself |
+| Infra CI | `.github/workflows/infra.yml` | `infra/`, or the workflow file itself |
 
-Each workflow uses Node.js 22 and runs these commands, in order, from inside the project's folder: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. The first command that fails stops the run and fails the check. npm downloads are cached using the project's `package-lock.json`.
+API CI and Web CI use Node.js 22 and run these commands, in order, from inside the project's folder: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. The first command that fails stops the run and fails the check. npm downloads are cached using the project's `package-lock.json`.
 
-A change that touches nothing in a project doesn't run that project's checks, so a change to only `docs/` runs neither. On a pull request, the Checks tab shows which workflow ran and which step failed.
+Infra CI uses Terraform 1.16.2 and runs, from inside `infra/`: `terraform fmt -check -recursive`, `terraform init -backend=false -input=false`, `terraform validate`, `terraform test`. `-backend=false` means it never reads the real state, so it needs no AWS credentials. To fix a formatting failure, run `terraform fmt -recursive` in `infra/`.
 
-The checks need no AWS account, network access or secrets, for the same reason the tests don't (see [Run the tests](#run-the-tests)).
+A change that touches nothing in a project doesn't run that project's checks, so a change to only `docs/` runs none of them. On a pull request, the Checks tab shows which workflow ran and which step failed.
+
+The checks need no AWS account or secrets, for the same reason the tests don't (see [Run the tests](#run-the-tests)). They download packages, and Infra CI downloads the AWS provider, but they never call AWS.
 
 To reproduce a CI run on your machine, run the same commands from the project's folder:
 
@@ -385,6 +395,129 @@ Running it again is safe, and it's how you reset the data before a demo or a use
 
 The seed data is made up. Never put real ward members' names or email addresses in it. To change it, edit `api/src/db/seed.ts` and run the command again.
 
+## Create the server
+
+In production, the app runs on one EC2 instance (see [the design](design.md#hosting)). The [Terraform](https://developer.hashicorp.com/terraform) config in `infra/` creates it, along with:
+
+- **An IAM role** that can read and write items in the app's table and its indexes, and nothing else in DynamoDB. The API gets its AWS access from this role, so no AWS keys go on the instance. The role also has the five permissions [Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html) needs to give you a shell.
+- **A security group** that lets in only HTTP (port 80) and HTTPS (port 443), from anywhere. Port 22 is closed, so there's no SSH. You get a shell through Session Manager instead.
+- **An Elastic IP**, a fixed public address for the domain's DNS record ([#43](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/43)). It stays the same when the instance is rebuilt.
+
+On its first boot, the instance installs Node.js 22, the version CI tests the API with. Putting the app on it is a separate step (see [Sections](#sections), item 11).
+
+### What you need
+
+- [Terraform](https://developer.hashicorp.com/terraform/install) 1.10 or later. Run `terraform version` to check.
+- The [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), signed in with credentials that can manage EC2 instances, security groups, Elastic IPs, IAM roles and instance profiles, read SSM parameters, and create an S3 bucket. The config sets its own region (below), so your CLI's default region doesn't matter to it.
+- The [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) for the AWS CLI, to open a shell on the instance.
+- The production table, made with `DYNAMODB_TABLE=sunday-school-prod npm run db:create` (see [Create the DynamoDB table](#in-aws)) in the region you'll use for the server. The role only allows a table in its own region.
+
+### Make the state bucket (once per AWS account)
+
+Terraform keeps its record of what it created, its *state*, in an S3 bucket. That way anyone with access to the AWS account can change or rebuild the server, not only the machine that created it. Bucket names are shared across all of AWS, so this one includes your account ID. Make it in the table's region, such as `us-east-1`:
+
+```sh
+export AWS_REGION=us-east-1   # the table's region
+BUCKET="sunday-school-terraform-$(aws sts get-caller-identity --query Account --output text)"
+aws s3api create-bucket --bucket "$BUCKET"
+aws s3api put-bucket-versioning --bucket "$BUCKET" --versioning-configuration Status=Enabled
+```
+
+In any region other than `us-east-1`, add `--create-bucket-configuration LocationConstraint="$AWS_REGION"` to `create-bucket`. Versioning keeps every earlier state, so you can go back to one if an apply goes wrong. New buckets block public access by default.
+
+Never commit a state file. The repository is public, and state lists the account's IDs. `infra/.gitignore` already leaves state files out.
+
+### Create it
+
+1. Copy the example settings, and check that `table_name` is the production table and `region` is its region:
+
+   ```sh
+   cd infra
+   cp terraform.tfvars.example terraform.tfvars
+   ```
+
+   `terraform.tfvars` stays out of the repository, like `api/.env`. The server's role, security group and instance are named after the table, such as `sunday-school-prod-server`. Every Terraform command uses the `region` set here, whatever `AWS_REGION` your shell has, so a later apply from another terminal can't build a second server in another region.
+
+2. Connect Terraform to the state bucket (`BUCKET` from the step above). Do this once per clone:
+
+   ```sh
+   terraform init -backend-config="bucket=$BUCKET" -backend-config="region=$AWS_REGION"
+   ```
+
+3. Look at what it will create, then create it:
+
+   ```sh
+   terraform plan
+   terraform apply
+   # Apply complete! Resources: 14 added, 0 changed, 0 destroyed.
+   #
+   # Outputs:
+   #
+   # instance_id = "i-0123456789abcdef0"
+   # public_ip = "203.0.113.10"
+   # role_name = "sunday-school-prod-server"
+   ```
+
+   **Checkpoint:** the apply ends with the three outputs. `terraform output` prints them again at any time.
+
+4. Wait about two minutes for the instance to boot and install Node.js, then open a shell on it and check:
+
+   ```sh
+   aws ssm start-session --target "$(terraform output -raw instance_id)"
+   # on the instance:
+   node --version
+   # v22...
+   exit
+   ```
+
+   The AWS CLI uses `AWS_REGION` or its own default region, not Terraform's, so in a new terminal add `--region` with the server's region if they differ.
+
+   **Checkpoint:** `node --version` prints a version starting with `v22`. The shell runs as `ssm-user`, which can use `sudo`. If it printed nothing or an error, `sudo cat /var/log/cloud-init-output.log` shows what happened at boot.
+
+Running `terraform apply` again is safe. If nothing in `infra/` has changed, it says `No changes`. Terraform also puts back anything changed outside it. For example, it removes a policy someone added to the role in the console.
+
+### Rebuild the instance
+
+The instance holds no data, so you can replace it whenever it misbehaves. To replace it:
+
+```sh
+terraform apply -replace=aws_instance.server
+```
+
+The new instance boots from the newest Amazon Linux 2023 image and gets the same Elastic IP. The app is down for a few minutes while this runs, so don't do it on a Sunday morning. Terraform doesn't move to a newer image on its own. It keeps the instance until you replace it.
+
+Changing `infra/user-data.sh` also replaces the instance on the next apply, because the script runs only on an instance's first boot. Anyone who can view the instance in AWS can read that script, so never put a secret in it.
+
+### Stop it when nobody needs the app
+
+`running` in `terraform.tfvars` starts and stops the instance. To stop it, set `running = false` and apply:
+
+```sh
+terraform apply
+# Apply complete! Resources: 0 added, 1 changed, 0 destroyed.
+```
+
+A stopped instance keeps its disk, Elastic IP and certificate, so nothing else changes. Set `running = true` and apply again to start it. The app is back about a minute later. While it's stopped, the app is down for everyone, including teachers who click a link in an email, so keep it running while the ward uses the app.
+
+Change the setting in `terraform.tfvars`, not with `-var` on the command line: the next apply without `-var` would flip it back. Keep `running = true` when the instance is created or replaced, so it can finish installing Node.js on its first boot. The install runs only once, so stopping the instance partway through leaves it without Node.js until it's replaced.
+
+### What it costs
+
+At on-demand prices in `us-east-1`, for an account outside the free tier:
+
+| | Running all month | Stopped all month |
+|---|---|---|
+| `t3.micro` instance | about $7.60 | $0 |
+| Elastic IP (AWS charges for every public IPv4 address) | about $3.65 | about $3.65 |
+| 8 GB disk | about $0.65 | about $0.65 |
+| **Total** | **about $11.90** | **about $4.30** |
+
+A partial month costs in proportion, so running it only for the weeks the ward uses the app costs a few dollars. `t3.micro` is free-tier eligible, so an account still in its free tier pays little or nothing. The state bucket costs a few cents at most. To stop all charges, tear the server down (below).
+
+### Tear it down
+
+The Elastic IP is protected, so `terraform destroy` stops with an error instead of giving the address away. To delete everything on purpose, remove the `lifecycle { prevent_destroy = true }` block from `aws_eip.server` in `infra/server.tf`, then run `terraform destroy`. The address is gone for good after that, so the domain's DNS record has to change. The table, the user pool and the state bucket aren't affected.
+
 ## When things go wrong
 
 - **`node --version` prints 21, 23, or something older than 20.** The tools these projects use (ESLint, Jest and Vite) don't support those versions. Install Node.js 20.19+, 22.13+, or 24+ and try again.
@@ -400,3 +533,7 @@ The seed data is made up. Never put real ward members' names or email addresses 
 - **A route answers `{"error":"Your account isn't on the Sunday School schedule yet. Ask a Sunday School leader to add you."}` (403).** The token is fine, but no Person in the table has that user's ID. Usually `DYNAMODB_TABLE` and `COGNITO_USER_POOL_ID` are for different environments, or the table was emptied after `npm run seed`. Run `npm run seed` again against the same table and pool.
 - **A route answers `{"error":"Something went wrong. Please try again."}` (500 or 503).** Look at the terminal where the API is running. It prints what failed, such as `Identifying the caller failed:`, `Listing assignments failed:` or `Updating an assignment failed:`, and the reason. A 503 means DynamoDB couldn't be reached, usually because DynamoDB Local isn't running. A 500 is anything else, such as cognito-local not running, the table not existing, or `DYNAMODB_TABLE` not set.
 - **`npm start` or `npm run preview` cannot find `dist/`.** Both run the compiled build. Run `npm run build` in the same project first.
+- **`terraform init` says the S3 bucket does not exist.** Make the [state bucket](#make-the-state-bucket-once-per-aws-account) first, and check that `BUCKET` and `AWS_REGION` in your shell match it. They're shell variables, so a new terminal needs them set again.
+- **`terraform apply` fails with `EntityAlreadyExists` for the role or instance profile.** The server already exists, but this Terraform can't see its state, usually because `terraform init` was given a different bucket. Run `terraform init -reconfigure` with the right bucket. Don't delete the existing role to get past the error.
+- **`aws ssm start-session` says `SessionManagerPlugin is not found`.** Install the [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) and open a new terminal.
+- **`aws ssm start-session` says `TargetNotConnected`.** The instance hasn't finished booting, or its agent hasn't checked in yet. Wait a minute and try again. If it still fails after five minutes, rebuild the instance (see [Rebuild the instance](#rebuild-the-instance)).
