@@ -5,7 +5,7 @@
 | **Authors** | Hyrum Kammerman |
 | **Reviewers** | [who reviewed it — a teammate, the instructor, a design-review partner] |
 | **Status** | In review |
-| **Last updated** | 2026-11-06 |
+| **Last updated** | 2026-11-18 |
 | **Links** | [Proposal](https://docs.google.com/document/d/19jYz_kN3rfb-afqCQExlSvgMchcfi33fQDmuWVzpjow/edit?usp=sharing) · [Repository](https://github.com/Sunday-School-Software/Sunday-School-Scheduler) · [Issue tracker](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues) |
 
 ## Revision history
@@ -24,12 +24,13 @@ Details for each revision are in the commit messages (`git log docs/design.md`).
 | 2026-11-16 | Hyrum Kammerman | §4: the UI follows the Model-View-Presenter pattern |
 | 2026-11-16 | Hyrum Kammerman | §4: `listAssignments()` takes a `person_id`, to match the code |
 | 2026-11-16 | Hyrum Kammerman | §4: the API row lists every status code the routes return (400, 401 and 503 were missing) |
+| 2026-11-18 | Hyrum Kammerman | Texts through AWS End User Messaging in a new Milestone 3, after the MVP: each person picks email or text (§2–§8) |
 
 ---
 
 ## 1. Context and scope
 
-Sunday School Scheduler is a web app that helps a Sunday School presidency in The Church of Jesus Christ of Latter-day Saints make sure every class on every Sunday has a teacher. Today my ward schedules teachers in a spreadsheet and confirms them by copying and pasting individual messages. The app shows the presidency which lessons are covered, gives teachers a frictionless way to confirm or ask for a substitute, and emails people when assignments are made or answered.
+Sunday School Scheduler is a web app that helps a Sunday School presidency in The Church of Jesus Christ of Latter-day Saints make sure every class on every Sunday has a teacher. Today my ward schedules teachers in a spreadsheet and confirms them by copying and pasting individual messages. The app shows the presidency which lessons are covered, gives teachers a frictionless way to confirm or ask for a substitute, and emails people when assignments are made or answered. After the MVP, people can choose to get those notifications by text instead.
 
 ## 2. Goals and non-goals
 
@@ -46,7 +47,7 @@ Sunday School Scheduler is a web app that helps a Sunday School presidency in Th
 - Other organizations (Relief Society, Elders' Quorum, Primary). The data model is Sunday School–specific.
 - More than one ward. There is no multi-tenant separation in the MVP.
 - Lesson-plan and content sharing between teachers.
-- SMS notifications. Email only for the MVP (see §6).
+- SMS in the MVP. Milestone 2 is email only; texts come in Milestone 3, after the pilot (see §6).
 - Importing members from Member Tools or other Church systems. People sign up, and leader roles are added by hand until admin functionality is implemented.
 
 ## 3. System-context diagram
@@ -59,6 +60,7 @@ flowchart LR
     cognito["Amazon Cognito<br/>(auth provider)"]
     ses["Amazon SES<br/>(email service)"]
     db["Amazon DynamoDB<br/>(database)"]
+    sms["AWS End User Messaging<br/>(texts, Milestone 3)"]
 
     leader -->|"edits people, classes and assignments,<br/>records responses for teachers without email"| app
     app -->|"4-Sunday schedule:<br/>covered, tentative, uncovered"| leader
@@ -73,27 +75,31 @@ flowchart LR
     app -->|"send-email requests"| ses
     ses -->|"assignment emails"| teacher
     ses -->|"response emails"| leader
+    app -.->|"send-text requests"| sms
+    sms -.->|"assignment texts"| teacher
+    sms -.->|"response texts"| leader
 
     classDef external stroke-dasharray: 5 5
-    class cognito,ses,db external
+    class cognito,ses,db,sms external
 ```
 
 ## 4. Architecture and components
 
-The UI runs in the browser. Everything else is one Node (TypeScript) process on an EC2 instance: an API that every request passes through, and four services behind it. The browser never holds AWS credentials; only the instance's IAM role can call DynamoDB and SES.
+The UI runs in the browser. Everything else is one Node (TypeScript) process on an EC2 instance: an API that every request passes through, and the services behind it (four in the MVP, plus the SMS Service in Milestone 3). The browser never holds AWS credentials; only the instance's IAM role can call DynamoDB, SES and End User Messaging.
 
 | Component | Responsibility | Talks to | Interface (rough) |
 |---|---|---|---|
 | UI | Sign-in, teacher dashboard, leader schedule, teacher actions, and messages. | API | HTTPS JSON with the JWT, e.g. `POST /login`, `GET /assignments`, `PUT /assignments/{class}` |
-| API | Verifies caller, checks their role, calls services, and sends notifications. | UI and the four services | HTTP routes returning JSON and status codes (200, 400, 401, 403, 500, 503) |
+| API | Verifies caller, checks their role, calls services, and sends notifications by each person's chosen channel. | UI and the services | HTTP routes returning JSON and status codes (200, 400, 401, 403, 500, 503) |
 | Auth Service | Signs users up and in through Cognito and verifies JWTs | Cognito | `register()`, `login()`, `logout()` → JWT; `verify(jwt)` → user_id |
-| User Service | Creates people, links and finds accounts and roles| DB | `create(name, email?)`, `linkAccount(user_id, email)`, `findByUserId(user_id)` → Person, `listLeaders()` → emails |
+| User Service | Creates people, links and finds accounts and roles, and stores how each person wants to be notified | DB | `create(name, email?)`, `linkAccount(user_id, email)`, `findByUserId(user_id)` → Person, `listLeaders()` → leaders' contact details; Milestone 3: `setNotifyBy(person, channel, phone?)` |
 | Class Service | Classes, assignments and responses | DB | `createClass()`, `assign(class, person)`, `reassign(class, from, to)`, `listAssignments(person_id, dates)`, `listSchedule(dates)`, `update(class, person, status)` |
 | Email Service | Sends notification emails. | SES | `email(addresses, message)` → OK/error |
+| SMS Service (Milestone 3) | Sends notification texts from the app's toll-free number. | End User Messaging | `text(phoneNumbers, message)` → OK/error |
 
 **Inside the UI.** The UI follows the Model-View-Presenter pattern. React components hold only view logic, presenters call the API through services and tell the components what to show, and one `ServerFacade` makes every API call. The [setup guide](setup.md#how-the-ui-is-organized) describes the folders.
 
-**Who can do what.** A teacher sees and responds to only their own assignments; anything else returns 403. A leader can also create classes and people, assign and reassign teachers, record responses for anyone, and see the full schedule. An admin manages accounts and roles (beyond December; see §8).
+**Who can do what.** A teacher sees and responds to only their own assignments; anything else returns 403. Only a person can switch their own notifications to text, because carriers require each person's own consent; a leader can't do it for them. A leader can also create classes and people, assign and reassign teachers, record responses for anyone, and see the full schedule. An admin manages accounts and roles (beyond December; see §8).
 
 ```mermaid
 flowchart LR
@@ -106,10 +112,12 @@ flowchart LR
         user["User Service<br/>people, roles, leaders"]
         cls["Class Service<br/>classes, assignments, responses"]
         email["Email Service<br/>notification emails"]
+        smssvc["SMS Service (Milestone 3)<br/>notification texts"]
     end
     cognito["Amazon Cognito"]
     db[("DynamoDB")]
     ses["Amazon SES"]
+    eum["AWS End User Messaging"]
 
     ui -->|"HTTPS JSON + JWT → JSON"| api
     api -->|"register(), login(), logout() → JWT<br/>verify(jwt) → user_id"| auth
@@ -120,6 +128,8 @@ flowchart LR
     user -->|"item reads and writes → JSON"| db
     cls -->|"queries, conditional writes → JSON"| db
     email -->|"send requests → OK/error"| ses
+    api -.->|"text(phoneNumbers, message) → error/OK"| smssvc
+    smssvc -.->|"send requests → OK/error"| eum
 
     style browser stroke-dasharray: 5 5
     style ec2 stroke-dasharray: 5 5
@@ -127,7 +137,7 @@ flowchart LR
 
 ### Hosting
 
-One EC2 instance, in the same AWS account as Cognito, DynamoDB and SES, runs Caddy in front of the Node process. Caddy serves the built UI bundle, provides HTTPS on the app's domain with automatic certificates, and forwards `/api` requests to Node. The instance's IAM role grants access to the app's tables and to SES, so no AWS keys live in the code. The instance holds no data, so it can be rebuilt from the repository; scripting the setup is part of deployment in Milestone 2.
+One EC2 instance, in the same AWS account as Cognito, DynamoDB and SES, runs Caddy in front of the Node process. Caddy serves the built UI bundle, provides HTTPS on the app's domain with automatic certificates, and forwards `/api` requests to Node. The instance's IAM role grants access to the app's tables, to SES, and (from Milestone 3) to sending texts from the app's number, so no AWS keys live in the code. The instance holds no data, so it can be rebuilt from the repository; scripting the setup is part of deployment in Milestone 2.
 
 ### Core flow, traced end to end
 
@@ -138,8 +148,8 @@ One EC2 instance, in the same AWS account as Cognito, DynamoDB and SES, runs Cad
 3. API → Class Service `listAssignments(person_id, next 4 Sundays)`. The UI renders the dashboard.
 4. The teacher clicks **Confirm**. UI → API `PUT /assignments/{class}`. The API identifies the caller again and checks that the assignment is theirs (or that they're a leader).
 5. API → Class Service `update(class, person, status)`, a conditional write that returns OK.
-6. API → User Service `listLeaders()`, then Email Service `email(addresses, message)` through SES.
-7. The API returns success and the UI shows a success message. If SES fails after the save, the API still returns 200 and the UI warns that the presidency wasn't notified.
+6. API → User Service `listLeaders()`, then Email Service `email(addresses, message)` through SES. From Milestone 3, leaders who chose text get `text(phoneNumbers, message)` from the SMS Service instead.
+7. The API returns success and the UI shows a success message. If SES (or, from Milestone 3, End User Messaging) fails after the save, the API still returns 200 and the UI warns that the presidency wasn't notified.
 
 A substitute request is the same flow with a different `status`.
 
@@ -222,12 +232,14 @@ sequenceDiagram
 
 | Entity | Key fields | Relationships | Owned by | MVP or roadmap |
 |---|---|---|---|---|
-| Person | person_id, name, role (admin / leader / teacher), email (optional), user_id (optional) | Has many Assignments; may link to one Cognito account | User Service | MVP |
+| Person | person_id, name, role (admin / leader / teacher), email (optional), user_id (optional); Milestone 3: phone (optional), notify_by (email / text), text_consent_at (optional) | Has many Assignments; may link to one Cognito account | User Service | MVP |
 | Class | class_id, name, date, num_teachers | One meeting of a class on one Sunday; has many Assignments | Class Service | MVP |
 | Assignment | person_id, class_id, status (pending / confirmed / substitute requested) | Joins Person and Class | Class Service | MVP |
 | Lesson note | class_id, author, content | Belongs to one Class | Class Service | Roadmap |
 
 Cognito owns credentials and login emails. Person covers teachers and leaders, so presidency emails go to people whose role is leader, and a leader can still be assigned to teach. A Person can have no account and no email: leaders still assign them and record their responses after talking to them. When someone signs up, `linkAccount()` attaches the account to the Person with the same email, or creates a new teacher.
+
+From Milestone 3, a Person has a `notify_by` channel, email by default. A signed-in person can switch to text by entering a phone number and agreeing to receive texts; `text_consent_at` records when they agreed, as carriers require. Someone who chose text gets texts only, not emails. Replying STOP turns texts off at the carrier, and the app then sends them email again if it has an address.
 
 On the schedule, a class is **covered** when it has `num_teachers` assignments that are all confirmed, **tentative** when it has `num_teachers` assignments and at least one is pending, and **uncovered** otherwise (too few assignments, or a substitute requested).
 
@@ -246,6 +258,9 @@ classDiagram
         role: admin, leader or teacher
         email, optional
         user_id, optional
+        phone, optional (Milestone 3)
+        notify_by: email or text (Milestone 3)
+        text_consent_at, optional (Milestone 3)
     }
     class Assignment {
         person_id FK
@@ -286,7 +301,15 @@ classDiagram
 - **Alternative considered:** SMS through AWS SNS, which teachers would read fastest on a Sunday morning.
 - **Why the chosen option wins, given our goals:** The 5-minute notification goals need a channel that works this semester. SMS needs registration steps we can't count on finishing in time. SES shares the stack's AWS account and is effectively free at our volume.
 - **Evidence:** CP3 spike (`aws-spike`): SES delivered; SNS SMS did not.
-- **What would change our mind:** Teachers say they don't check email fast enough to meet the 5-minute goal. SMS would then become a roadmap item.
+- **What would change our mind:** Teachers say they don't check email fast enough to meet the 5-minute goal. That hasn't happened: in the Milestone 1 teacher test ([#65](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/65)), the teacher preferred the app to replying to a text. Email stays the MVP's only channel; texts are added after it for a different reason (next decision).
+
+### Decision: add texts through AWS End User Messaging after the MVP
+
+- **Chosen:** In Milestone 3, each person chooses email or text. Texts go through AWS End User Messaging from a registered US toll-free number.
+- **Alternatives considered:** Twilio, at about the same price. Keeping email only.
+- **Why the chosen option wins, given our goals:** The project has more hours after the MVP than planned, and texts reach people the way the ward already messages each other on a Sunday morning. End User Messaging shares the AWS account, IAM role and bill with SES and DynamoDB, so there's no second vendor or credentials to keep on the instance. A toll-free number is $2 a month, and texts cost a few cents each, a few dollars a month at our volume. Letting each person pick one channel avoids sending everyone two copies, at the cost of a setting to build and a channel that can fail on its own.
+- **Evidence:** None yet. In the CP3 spike (`aws-spike`), SNS SMS did not deliver. US carriers now require a registered number, which can take up to 15 business days to approve, so the registration is submitted before any code is written.
+- **What would change our mind:** The registration is denied, or isn't approved by Dec 10. Then everyone stays on email and texts go back on the roadmap.
 
 ### Decision: store data in DynamoDB
 
@@ -312,20 +335,23 @@ classDiagram
 | SES sandbox only sends to verified addresses. | Real teachers get no email until AWS grants production access. | Hyrum | Request production access by Nov 18 (it needs no code), so there is time to resubmit if it is denied before the Nov 29 pilot. |
 | Two people edit the same class at once. | A lost update could show a class as covered when it isn't. | Hyrum | Teachers' own responses use conditional writes in Milestone 1. Safe leader edits to classes and assignments are on the roadmap; the pilot has one leader editing, so watch for lost updates during the pilot. |
 | DynamoDB keys for relational data. | A poor key design makes the 4-Sunday view slow or awkward. | Hyrum | Write down the access patterns ([data-model.md](data-model.md)) and create the tables in Milestone 1, by Nov 18. |
-| Collecting contact information ethically. | Church member data has usage policies. | Hyrum | Check Member Tools policies and include only people who agree, before the pilot. |
+| Collecting contact information ethically. | Church member data has usage policies, and phone numbers (Milestone 3) are more personal than email. | Hyrum | Check Member Tools policies and include only people who agree, before the pilot. Only a person can add their own phone number. |
+| Toll-free registration isn't approved in time. | Approval can take up to 15 business days, so Milestone 3 can't send a text until it comes through. | Hyrum | Publish the privacy policy and terms pages the registration requires and submit it by Nov 20. If it's denied, fix what it names and resubmit. If it isn't approved by Dec 10, ship Milestone 3 with texts turned off. |
+| A person who chose text stops getting messages. | A failed or blocked text means they aren't notified, since they get no email. | Hyrum | Treat a failed text like a failed email (§4 step 7), and test it. After STOP, fall back to email if there's an address. |
 | Will teachers use this rather than texts? | The value depends on teachers responding in the app. | Hyrum | Interview 1–2 other teachers by Nov 18. |
 
 ## 8. Implementation plan
 
 The live plan is the repo's [milestones page](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/milestones). If this table and the milestones page disagree, the milestones page is right.
 
-The build window runs from Oct 26 to the second pilot Sunday, Dec 6. The proposal budgeted 20–25 hours. Milestone 1 is now estimated at 17.5–19 h and Milestone 2 at about 14 h plus deployment, which isn't sized yet, so the plan runs at least 6.5 h over budget. I'll cover the overrun with my own time (see the [Milestone 1 capacity check](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/milestone/2)). Milestone 2 is the squeeze: everything the pilot needs must be live by Nov 28, ten days after the demo and over Thanksgiving week. Milestones 0–2 are the proposal's P0 deliverable; admin and broadcast are a P1 goal for after December.
+The build window runs from Oct 26 to the second pilot Sunday, Dec 6. The proposal budgeted 20–25 hours. Milestone 1 is now estimated at 17.5–19 h and Milestone 2 at about 14 h plus deployment, which isn't sized yet, so the plan runs at least 6.5 h over budget. I'll cover the overrun with my own time (see the [Milestone 1 capacity check](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/milestone/2)). Milestone 2 is the squeeze: everything the pilot needs must be live by Nov 28, ten days after the demo and over Thanksgiving week. Milestones 0–2 are the proposal's P0 deliverable; admin and broadcast are a P1 goal for after December. Milestone 3 (texts) was added on Nov 18, after the project gained hours; it comes after the pilot, so it can't delay the MVP.
 
 | Milestone | What works when it's done | Depends on |
 |---|---|---|
 | Milestone 0: Walking Skeleton · no date · not estimated | **Local setup:** the code needed to test, lint and run the project locally (the API and UI scaffolds, the test setup and the setup guide). Epic: [Walking Skeleton](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/22). | — |
 | Milestone 1: Thinnest Slice · Nov 18 · ~17.5–19 h | **Nov 18 demo:** a teacher logs in, sees their hand-seeded assignments for the next 4 Sundays, confirms one, and sees it marked confirmed. It runs locally against the real Cognito pool and DynamoDB tables. The API rejects changes to others' assignments, and the UI shows the DB-down error. Epics: [Data in DynamoDB](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/27), [Sign-in with Cognito](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/28), [Teacher confirms a lesson](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/29). | Milestone 0 |
 | Milestone 2: MVP Complete · Dec 2 · ~14 h + deployment | **MVP:** the app is deployed on EC2 behind Caddy. Leaders build the 4-Sunday schedule and get an email for every teacher response (the teacher sees a warning if the email fails). Teachers without accounts are covered, SES production access is approved, and the ward runs the pilot starting Nov 29 (the proposal's success criterion). Epics: [Deploy to EC2 behind Caddy](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/30), [Leaders hear about every response](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/47), [Leaders build the schedule](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/48), [Teachers outside the app](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/49), [Ward pilot](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/50). | Milestone 1 |
+| Milestone 3: Notifications by text · Dec 10 · ~10–15 h | **Texts:** a signed-in person can choose to get notifications by text instead of email, after agreeing to receive texts. Leaders who chose text get a text for every teacher response, and teachers who chose text get one when they're assigned. The app's toll-free number is registered. | Milestone 2, and an approved toll-free registration |
 | Beyond December · ~3–4 h | **Admin and broadcast:** an admin creates accounts and sets roles; a leader messages all teachers at once. Safe concurrent edits for leaders are also deferred; see §7. | Milestone 2 |
 
 ---

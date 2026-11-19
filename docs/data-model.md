@@ -1,6 +1,6 @@
 # Data model in DynamoDB
 
-This page shows how the entities in [design §5](design.md#5-data-model) are stored in DynamoDB: the table, its keys and indexes, and the query behind every read and write the app makes in Milestones 1 and 2. Read it before you write code that touches the database.
+This page shows how the entities in [design §5](design.md#5-data-model) are stored in DynamoDB: the table, its keys and indexes, and the query behind every read and write the app makes in Milestones 1 to 3. Read it before you write code that touches the database.
 
 DynamoDB has no joins, so the keys are designed around the questions the app asks ("a teacher's assignments for the next 4 Sundays"), not around the entities. If you need a query that isn't in [Access patterns](#access-patterns), add it here first, in the same pull request as the code.
 
@@ -33,7 +33,7 @@ Every item has a partition key `pk` and a sort key `sk`, both strings. The prefi
 
 | Item | `pk` | `sk` | Other attributes |
 |---|---|---|---|
-| Person | `PERSON#<person_id>` | `PERSON` | `person_id`, `name`, `role` (`admin`, `leader` or `teacher`), `email` (optional, lowercase), `user_id` (optional, the Cognito `sub`) |
+| Person | `PERSON#<person_id>` | `PERSON` | `person_id`, `name`, `role` (`admin`, `leader` or `teacher`), `email` (optional, lowercase), `user_id` (optional, the Cognito `sub`); from Milestone 3, `phone` (optional, E.164 such as `+18015550100`), `notify_by` (`email` or `text`; missing means `email`) and `text_consent_at` (optional, ISO timestamp) |
 | Class | `CLASS#<class_id>` | `CLASS` | `class_id`, `name`, `date`, `num_teachers` |
 | Assignment | `CLASS#<class_id>` | `ASSIGN#<person_id>` | `class_id`, `person_id`, `status` (`pending`, `confirmed` or `substitute requested`), `updated_at`, and copies of `class_name`, `date` and `person_name` |
 
@@ -70,7 +70,7 @@ All four are global secondary indexes that project all attributes.
 
 ## Access patterns
 
-Every read and write the app makes in Milestones 1 and 2. None of them scans the table.
+Every read and write the app makes in Milestones 1 to 3. None of them scans the table.
 
 | # | Pattern | Service method | Milestone | How |
 |---|---|---|---|---|
@@ -81,13 +81,14 @@ Every read and write the app makes in Milestones 1 and 2. None of them scans the
 | 5 | Every class and assignment for the next 4 Sundays | Class `listSchedule(dates)` | 2 ([#48]) | Query `GSI2`: `gsi2pk = SCHEDULE` and `gsi2sk BETWEEN :from AND :to`. Class Service works out covered, tentative and uncovered from the results |
 | 6 | One class with everyone assigned to it | Class Service | 2 ([#48]) | Query: `pk = CLASS#<class_id>` |
 | 7 | Everyone, to pick a teacher to assign | User Service | 2 ([#48]) | Query `GSI1`: `gsi1pk = PEOPLE` |
-| 8 | The leaders' emails | User `listLeaders()` | 2 ([#47]) | Query `GSI1`: `gsi1pk = PEOPLE` and `begins_with(gsi1sk, "leader#")` |
+| 8 | The leaders' contact details (email, and from Milestone 3 phone and `notify_by`) | User `listLeaders()` | 2 ([#47]) | Query `GSI1`: `gsi1pk = PEOPLE` and `begins_with(gsi1sk, "leader#")` |
 | 9 | Add a person | User `create(name, email?)` | 2 ([#48], [#49]) | Query `ByEmail` first if there's an email, then PutItem with `attribute_not_exists(pk)` |
 | 10 | Link a new account to an existing Person | User `linkAccount(user_id, email)` | 2 ([#49]) | Query `ByEmail`. If a Person is found, UpdateItem `SET user_id` with `attribute_not_exists(user_id)`; if not, PutItem a new teacher |
 | 11 | Add a class | Class `createClass()` | 2 ([#48]) | PutItem with `attribute_not_exists(pk)` |
 | 12 | Assign a teacher to a class | Class `assign(class, person)` | 2 ([#48]) | GetItem the class and the Person for the copied fields, then TransactWriteItems: ConditionCheck that both still exist, and Put the assignment with `attribute_not_exists(pk)` |
 | 13 | Replace one teacher with another | Class `reassign(class, from, to)` | 2 ([#48]) | TransactWriteItems: Delete the old assignment with `attribute_exists(pk)` and Put the new one with `attribute_not_exists(pk)` |
 | 14 | A leader records a response for someone | Class `update(class, person, status)` | 2 ([#49]) | The same UpdateItem as pattern 3; the API checks that the caller is a leader |
+| 15 | A person chooses email or text | User `setNotifyBy(person, channel, phone?)` | 3 | UpdateItem on the Person's key, `SET notify_by` (and `phone`, `text_consent_at` when switching to text) with `attribute_exists(pk)`; the API checks that the caller is that person |
 
 ### Date windows
 
