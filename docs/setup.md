@@ -449,7 +449,7 @@ Never commit a state file. The repository is public, and state lists the account
    ```sh
    terraform plan
    terraform apply
-   # Apply complete! Resources: 13 added, 0 changed, 0 destroyed.
+   # Apply complete! Resources: 14 added, 0 changed, 0 destroyed.
    #
    # Outputs:
    #
@@ -488,9 +488,31 @@ The new instance boots from the newest Amazon Linux 2023 image and gets the same
 
 Changing `infra/user-data.sh` also replaces the instance on the next apply, because the script runs only on an instance's first boot. Anyone who can view the instance in AWS can read that script, so never put a secret in it.
 
+### Stop it when nobody needs the app
+
+`running` in `terraform.tfvars` starts and stops the instance. To stop it, set `running = false` and apply:
+
+```sh
+terraform apply
+# Apply complete! Resources: 0 added, 1 changed, 0 destroyed.
+```
+
+A stopped instance keeps its disk, Elastic IP and certificate, so nothing else changes. Set `running = true` and apply again to start it. The app is back about a minute later. While it's stopped, the app is down for everyone, including teachers who click a link in an email, so keep it running while the ward uses the app.
+
+Change the setting in `terraform.tfvars`, not with `-var` on the command line: the next apply without `-var` would flip it back. Keep `running = true` when the instance is created or replaced, so it can finish installing Node.js on its first boot. The install runs only once, so stopping the instance partway through leaves it without Node.js until it's replaced.
+
 ### What it costs
 
-The instance is a `t3.micro`, which is free-tier eligible (see [the design's goals](design.md#2-goals-and-non-goals)). AWS charges for every public IPv4 address, the Elastic IP included, at about $3.60 a month unless your free tier covers it. The state bucket costs a few cents at most.
+At on-demand prices in `us-east-1`, for an account outside the free tier:
+
+| | Running all month | Stopped all month |
+|---|---|---|
+| `t3.micro` instance | about $7.60 | $0 |
+| Elastic IP (AWS charges for every public IPv4 address) | about $3.65 | about $3.65 |
+| 8 GB disk | about $0.65 | about $0.65 |
+| **Total** | **about $11.90** | **about $4.30** |
+
+A partial month costs in proportion, so running it only for the weeks the ward uses the app costs a few dollars. `t3.micro` is free-tier eligible, so an account still in its free tier pays little or nothing. The state bucket costs a few cents at most. To stop all charges, tear the server down (below).
 
 ### Tear it down
 

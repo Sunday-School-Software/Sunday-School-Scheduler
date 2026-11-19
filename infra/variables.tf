@@ -8,6 +8,11 @@ variable "region" {
   }
 }
 
+variable "running" {
+  description = "true keeps the instance running; false stops it, so its compute isn't billed. Set it in terraform.tfvars, so a later apply doesn't flip it back."
+  type        = bool
+}
+
 variable "table_name" {
   description = "The DynamoDB table the API uses, such as sunday-school-prod. The server's resources are named after it."
   type        = string

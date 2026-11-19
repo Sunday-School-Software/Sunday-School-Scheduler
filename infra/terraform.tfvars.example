@@ -6,6 +6,11 @@
 # bucket's region is the same.
 region = "us-east-1"
 
+# false stops the instance when nobody needs the app, true starts it again.
+# Keep it true when the instance is created or replaced, so it can finish
+# installing Node.js on its first boot.
+running = true
+
 # The DynamoDB table the API uses. Create it first with `npm run db:create` in
 # api/ (see docs/setup.md).
 table_name = "sunday-school-prod"

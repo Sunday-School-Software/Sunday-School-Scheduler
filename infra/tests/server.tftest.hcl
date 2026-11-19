@@ -1,5 +1,5 @@
 # Checks the server's network rules and its role's permissions, the two things
-# issue #42's acceptance criteria limit. Runs against a fake AWS provider: no
+# issue #42's acceptance criteria limit, and the switch that stops it. Runs against a fake AWS provider: no
 # credentials, and nothing is created. Run from infra/:
 #   terraform init -backend=false
 #   terraform test
@@ -17,6 +17,7 @@ mock_provider "aws" {
 
 variables {
   region     = "us-east-1"
+  running    = true
   table_name = "sunday-school-test"
 }
 
@@ -41,6 +42,28 @@ run "network" {
   assert {
     condition     = aws_vpc_security_group_egress_rule.all.ip_protocol == "-1" && aws_vpc_security_group_egress_rule.all.cidr_ipv4 == "0.0.0.0/0"
     error_message = "The server needs an allow-all outbound rule, or it can't install Node or reach DynamoDB."
+  }
+}
+
+run "running" {
+  command = plan
+
+  assert {
+    condition     = aws_ec2_instance_state.server.state == "running"
+    error_message = "running = true should keep the instance running."
+  }
+}
+
+run "stopped" {
+  command = plan
+
+  variables {
+    running = false
+  }
+
+  assert {
+    condition     = aws_ec2_instance_state.server.state == "stopped"
+    error_message = "running = false should stop the instance."
   }
 }
 

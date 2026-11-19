@@ -65,6 +65,13 @@ resource "aws_instance" "server" {
   }
 }
 
+# Stopped, the instance isn't billed for compute, but it keeps its disk,
+# Elastic IP and certificate, so starting it again takes about a minute.
+resource "aws_ec2_instance_state" "server" {
+  instance_id = aws_instance.server.id
+  state       = var.running ? "running" : "stopped"
+}
+
 # The domain's DNS record (#43) points here, and the address stays the same
 # when the instance is rebuilt. Once released, the address is gone for good.
 resource "aws_eip" "server" {
