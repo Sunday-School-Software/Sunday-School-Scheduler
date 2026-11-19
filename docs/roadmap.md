@@ -55,22 +55,22 @@ Deployment moved from Milestone 1 to Milestone 2, but it's still part of the MVP
 - **What it needs first:** the Email Service from [#47](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/47) and SES production access from [#50](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/50). Teachers with no email ([#49](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/49)) won't get a broadcast, so leaders still need another way to reach them.
 - **How to help:** open an issue to decide what a broadcast looks like and what the leader sees if some emails fail.
 
+### 6. Notifications by text (Planned)
+
+- **What a user could do:** choose to get assignment and response notifications by text instead of email.
+- **Why it isn't in the MVP:** carriers require a registered number first, and approval can take up to 15 business days, too late for the pilot. It's [Milestone 3](design.md#8-implementation-plan), due Dec 10, after the MVP ([design §6](design.md#decision-add-texts-through-aws-end-user-messaging-after-the-mvp)).
+- **What it needs first:** an approved toll-free registration, which needs public privacy policy and terms pages. Phone numbers on Person raise the contact-information concerns in [design §7](design.md#7-risks-and-open-questions).
+- **How to help:** if you've registered a toll-free number for texts before, comment on the Milestone 3 issues. If you're a teacher or leader, say whether you'd switch to texts.
+
 ## Later
 
-### 6. Lesson notes (Idea)
+### 7. Lesson notes (Idea)
 
 - **What a user could do:** attach a short note to one class on one Sunday. The data model has a Lesson note entity marked "Roadmap", with a class, an author and some content ([design §5](design.md#5-data-model)).
 - **What it isn't:** a place for teachers to share lesson plans or other content. That's a non-goal (see [Non-goals](#non-goals)). The design doesn't yet say who can read a note, so that's the first thing to decide.
 - **Why it isn't in the MVP:** the MVP's goals ([design §2](design.md#2-goals-and-non-goals)) are about getting every class a teacher, and notes don't help with that.
 - **What it needs first:** the MVP, and an agreed answer in an issue to who writes and reads notes.
 - **How to help:** if you're a teacher or leader and would use notes, open an issue saying what you'd write and who should see it.
-
-### 7. SMS notifications (Idea)
-
-- **What a user could do:** get assignment and response notifications by text instead of email.
-- **Why it isn't in the MVP:** SMS is a non-goal for the MVP ([design §2](design.md#2-goals-and-non-goals)). It needs registration steps we couldn't count on finishing this semester, and in the CP3 spike, SES delivered email but SNS didn't deliver SMS ([design §6](design.md#decision-send-notifications-by-email-through-aws-ses)).
-- **What it needs first:** evidence that email is too slow. Design §6 says SMS becomes a roadmap item if teachers say they don't check email fast enough to meet the 5-minute goal. It would also need phone numbers on Person, which raises the contact-information concerns in [design §7](design.md#7-risks-and-open-questions).
-- **How to help:** if you're a teacher and email is too slow for you, say so in an issue. That's the evidence this needs. If you've set up SMS sending on AWS before, that experience helps too.
 
 ### 8. Move the API to Lambda (Idea)
 
@@ -86,7 +86,7 @@ These are out of scope ([design §2](design.md#2-goals-and-non-goals)). If you t
 - Other organizations (Relief Society, Elders' Quorum, Primary). The data model is Sunday School–specific.
 - More than one ward. There's no multi-tenant separation.
 - Lesson-plan and content sharing between teachers.
-- SMS notifications in the MVP. Email only (see item 7 for when that could change).
+- SMS notifications in the MVP. The MVP is email only; texts come after it (see item 6).
 - Importing members from Member Tools or other Church systems.
 
 If you think a non-goal should change, open an issue that explains the problem it would solve and who has it. The maintainer makes the final call and explains why in the thread ([communication norms](communication-norms.md#making-decisions)).
