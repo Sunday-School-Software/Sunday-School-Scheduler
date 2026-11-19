@@ -36,5 +36,5 @@ Hours logged as I work, starting 11/18/2026.
 
 | Date | What | Hours |
 |---|---|---|
-| 11/18/2026 | Researched the cost and setup time for text notifications, planned them as Milestone 3 in the design doc, roadmap and data model, and drafted the issues | 0.5 |
-| **Total** | | **0.5** |
+| 11/18/2026 | Researched the cost and setup time for text notifications, planned them as Milestone 3 in the design doc, roadmap and data model, and drafted the issues; planned the EC2 server and wrote the Terraform that creates it, its IAM role, security group and Elastic IP | 1.5 |
+| **Total** | | **1.5** |

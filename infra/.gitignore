@@ -1,0 +1,12 @@
+# Providers downloaded by `terraform init`
+.terraform/
+
+# State lives in S3. A local copy holds the account's IDs, so never commit one.
+*.tfstate
+*.tfstate.*
+
+# This environment's settings (copy terraform.tfvars.example)
+terraform.tfvars
+
+*.tfplan
+crash.log

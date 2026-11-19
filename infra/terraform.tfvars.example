@@ -1,0 +1,11 @@
+# Copy this file to infra/terraform.tfvars and fill it in:
+#   cp terraform.tfvars.example terraform.tfvars
+# terraform.tfvars is gitignored: production settings stay out of the repo.
+
+# The region the table is in. The server is created there too, and the state
+# bucket's region is the same.
+region = "us-east-1"
+
+# The DynamoDB table the API uses. Create it first with `npm run db:create` in
+# api/ (see docs/setup.md).
+table_name = "sunday-school-prod"
