@@ -2,7 +2,11 @@
 
 Time spent on Sunday School Scheduler.
 
-This project is counting for two classes, so I've already started it. Entries before 11/17/2026 were reconstructed by AI from the repo's commit history, so their hours are estimates.
+This project is counting for two classes, so I've already started it.
+
+## Estimated hours
+
+These entries, through 11/17/2026, were reconstructed by AI from the repo's commit history, so their hours are estimates.
 
 | Date | What | Hours |
 |---|---|---|
@@ -25,3 +29,12 @@ This project is counting for two classes, so I've already started it. Entries be
 | 11/16/2026 | Built the login screen, the API route that lists a teacher's assignments for the next 4 Sundays (503 when DynamoDB is down), the teacher dashboard, the API route that confirms an assignment, and the dashboard's confirm and request-a-substitute buttons | 7 |
 | 11/17/2026 | Revised the communication norms, started this log | 0.5 |
 | **Total** | | **35.5** |
+
+## Logged hours
+
+Hours logged as I work, starting 11/18/2026.
+
+| Date | What | Hours |
+|---|---|---|
+| 11/18/2026 | Researched the cost and setup time for text notifications, planned them as Milestone 3 in the design doc, roadmap and data model, and drafted the issues | 0.5 |
+| **Total** | | **0.5** |
