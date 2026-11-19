@@ -154,6 +154,12 @@ Put a test next to the file it tests and name it `<file>.test.ts` (or `.test.tsx
 
 Import `describe`, `it`, `expect` and `jest` from `@jest/globals`, so TypeScript knows their types. Jest still sets them as globals too, and React Testing Library relies on that to clean up after each test, so don't turn the globals off. To run one file, or rerun tests when files change, pass Jest options after `--`, for example `npm test -- src/App.test.tsx` or `npm test -- --watch`.
 
+The Terraform config in `infra/` has its own tests, which check the server's network rules and its role's permissions against a fake AWS provider. They need [Terraform](https://developer.hashicorp.com/terraform/install) 1.10 or later, but no AWS account, and nothing is created:
+
+```sh
+(cd infra && terraform init -backend=false && terraform test)
+```
+
 CI runs these tests for you on every push and pull request (see [Continuous integration](#continuous-integration)).
 
 ## Continuous integration
@@ -164,12 +170,15 @@ GitHub Actions runs the checks for you on every push to any branch and on every 
 |---|---|---|
 | API CI | `.github/workflows/api.yml` | `api/`, or the workflow file itself |
 | Web CI | `.github/workflows/web.yml` | `web/`, or the workflow file itself |
+| Infra CI | `.github/workflows/infra.yml` | `infra/`, or the workflow file itself |
 
-Each workflow uses Node.js 22 and runs these commands, in order, from inside the project's folder: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. The first command that fails stops the run and fails the check. npm downloads are cached using the project's `package-lock.json`.
+API CI and Web CI use Node.js 22 and run these commands, in order, from inside the project's folder: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. The first command that fails stops the run and fails the check. npm downloads are cached using the project's `package-lock.json`.
 
-A change that touches nothing in a project doesn't run that project's checks, so a change to only `docs/` runs neither. On a pull request, the Checks tab shows which workflow ran and which step failed.
+Infra CI uses Terraform 1.16.2 and runs, from inside `infra/`: `terraform fmt -check -recursive`, `terraform init -backend=false -input=false`, `terraform validate`, `terraform test`. `-backend=false` means it never reads the real state, so it needs no AWS credentials. To fix a formatting failure, run `terraform fmt -recursive` in `infra/`.
 
-The checks need no AWS account, network access or secrets, for the same reason the tests don't (see [Run the tests](#run-the-tests)).
+A change that touches nothing in a project doesn't run that project's checks, so a change to only `docs/` runs none of them. On a pull request, the Checks tab shows which workflow ran and which step failed.
+
+The checks need no AWS account or secrets, for the same reason the tests don't (see [Run the tests](#run-the-tests)). They download packages, and Infra CI downloads the AWS provider, but they never call AWS.
 
 To reproduce a CI run on your machine, run the same commands from the project's folder:
 
