@@ -2,13 +2,18 @@
 #   cp terraform.tfvars.example terraform.tfvars
 # terraform.tfvars is gitignored: production settings stay out of the repo.
 
+# The app's domain, and the Route 53 hosted zone it's in. The domain can be
+# the zone itself or a name inside it, such as scheduler.example.org.
+domain      = "scheduler.example.org"
+hosted_zone = "example.org"
+
 # The region the table is in. The server is created there too, and the state
 # bucket's region is the same.
 region = "us-east-1"
 
 # false stops the instance when nobody needs the app, true starts it again.
 # Keep it true when the instance is created or replaced, so it can finish
-# installing Node.js on its first boot.
+# installing Node.js and Caddy on its first boot.
 running = true
 
 # The DynamoDB table the API uses. Create it first with `npm run db:create` in

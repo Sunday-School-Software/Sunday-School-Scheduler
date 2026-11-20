@@ -37,10 +37,19 @@ resource "aws_instance" "server" {
   iam_instance_profile   = aws_iam_instance_profile.server.name
   vpc_security_group_ids = [aws_security_group.server.id]
 
-  # cloud-init runs user data only on first boot, so a change to the script
-  # needs a new instance to take effect. The instance holds no data.
-  user_data                   = file("${path.module}/user-data.sh")
+  # cloud-init runs user data only on first boot, so a change to the script,
+  # the Caddyfile or the domain needs a new instance to take effect. The
+  # instance holds no data.
+  user_data = templatefile("${path.module}/user-data.sh", {
+    caddyfile = chomp(file("${path.module}/Caddyfile"))
+    domain    = var.domain
+  })
   user_data_replace_on_change = true
+
+  # Caddy asks for its certificate as soon as it starts on first boot, and the
+  # certificate authority checks that the domain points here. Creating the DNS
+  # record first saves Caddy failed tries.
+  depends_on = [aws_route53_record.app]
 
   # IMDSv2 only, so a request forged through the app can't read the role's
   # credentials.
@@ -72,7 +81,7 @@ resource "aws_ec2_instance_state" "server" {
   state       = var.running ? "running" : "stopped"
 }
 
-# The domain's DNS record (#43) points here, and the address stays the same
+# The domain's DNS record (dns.tf) points here, and the address stays the same
 # when the instance is rebuilt. Once released, the address is gone for good.
 resource "aws_eip" "server" {
   domain = "vpc"

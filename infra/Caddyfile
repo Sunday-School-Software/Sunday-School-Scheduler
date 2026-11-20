@@ -1,0 +1,34 @@
+# Caddy's config on the server (design §4). user-data.sh installs it as
+# /etc/caddy/Caddyfile on the instance's first boot, and sets DOMAIN to the
+# `domain` in terraform.tfvars.
+#
+# Because the site's address is a domain name, Caddy gets and renews its HTTPS
+# certificate on its own, and redirects HTTP to HTTPS.
+{
+	# The security group opens TCP 443 but not UDP, so HTTP/3 can't get
+	# through. Not offering it saves browsers a failed try.
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# The API's routes all start with /api (api/src/app.ts), so the path is
+	# passed on unchanged. /api on its own goes to the API too, which answers
+	# unknown routes, rather than to the UI.
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy localhost:3000
+	}
+
+	# Everything else is the UI's built bundle (web/dist). A path that isn't a
+	# file, such as /dashboard, gets index.html, so React Router can show that
+	# page when someone refreshes or opens a link to it.
+	handle {
+		root * /srv/sunday-school/web
+		try_files {path} /index.html
+		file_server
+	}
+}
