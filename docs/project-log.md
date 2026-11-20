@@ -38,4 +38,5 @@ Hours logged as I work, starting 11/18/2026.
 |---|---|---|
 | 11/18/2026 | Researched the cost and setup time for text notifications, planned them as Milestone 3 in the design doc, roadmap and data model, and drafted the issues; planned the EC2 server and wrote the Terraform that creates it, its IAM role, security group and Elastic IP | 1.5 |
 | 11/19/2026 | Worked out the server's monthly cost, added a setting that stops the instance when nobody needs the app, and created the production table and server in AWS and checked them | 1 |
-| **Total** | | **2.5** |
+| 11/20/2026 | Set up Caddy to serve the app over HTTPS, pointed the domain at the server with a Route 53 record, and tested the setup locally | 0.5 |
+| **Total** | | **3** |
