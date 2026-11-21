@@ -174,7 +174,7 @@ GitHub Actions runs the checks for you on every push to any branch and on every 
 
 API CI and Web CI use Node.js 22 and run these commands, in order, from inside the project's folder: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. The first command that fails stops the run and fails the check. npm downloads are cached using the project's `package-lock.json`.
 
-Infra CI uses Terraform 1.16.2 and runs, from inside `infra/`: `terraform fmt -check -recursive`, `terraform init -backend=false -input=false`, `terraform validate`, `terraform test`. `-backend=false` means it never reads the real state, so it needs no AWS credentials. To fix a formatting failure, run `terraform fmt -recursive` in `infra/`. Last, it checks `infra/Caddyfile` with Caddy's own `caddy fmt --diff` and `caddy validate`, in Caddy's Docker image. If you have [Caddy](https://caddyserver.com/docs/install) installed, `caddy fmt --overwrite infra/Caddyfile` fixes a formatting failure.
+Infra CI uses Terraform 1.16.2 and runs, from inside `infra/`: `terraform fmt -check -recursive`, `terraform init -backend=false -input=false`, `terraform validate`, `terraform test`. `-backend=false` means it never reads the real state, so it needs no AWS credentials. To fix a formatting failure, run `terraform fmt -recursive` in `infra/`.
 
 A change that touches nothing in a project doesn't run that project's checks, so a change to only `docs/` runs none of them. On a pull request, the Checks tab shows which workflow ran and which step failed.
 
@@ -417,7 +417,6 @@ Putting the app on the server is a separate step (see [Sections](#sections), ite
 - [Terraform](https://developer.hashicorp.com/terraform/install) 1.10 or later. Run `terraform version` to check.
 - The [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), signed in with credentials that can manage EC2 instances, security groups, Elastic IPs, IAM roles and instance profiles, and Route 53 records, read SSM parameters, and create an S3 bucket. The config sets its own region (below), so your CLI's default region doesn't matter to it.
 - The [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) for the AWS CLI, to open a shell on the instance.
-- A domain with a Route 53 public hosted zone, in the same AWS account. The app can use the domain itself (`example.org`) or a name inside it (`scheduler.example.org`). [Registering a domain with Route 53](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-register.html) creates its hosted zone. For a domain registered somewhere else, [create a hosted zone](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/CreatingHostedZone.html) for it and set the domain's name servers, at its registrar, to the four the zone lists.
 - The production table, made with `DYNAMODB_TABLE=sunday-school-prod npm run db:create` (see [Create the DynamoDB table](#in-aws)) in the region you'll use for the server. The role only allows a table in its own region.
 
 ### Make the state bucket (once per AWS account)
