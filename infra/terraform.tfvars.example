@@ -19,3 +19,9 @@ running = true
 # The DynamoDB table the API uses. Create it first with `npm run db:create` in
 # api/ (see docs/setup.md).
 table_name = "sunday-school-prod"
+
+# The production user pool. `npm run cognito:create` in api/ prints both IDs
+# (see docs/setup.md). deploy.sh gives them to the API with the region and the
+# table name.
+cognito_user_pool_id = "us-east-1_AbCdEf123"
+cognito_client_id    = "1example23456789abcdefghij"

@@ -1,0 +1,36 @@
+# Runs the API on the server. install-release.sh installs this file as
+# /etc/systemd/system/sunday-school-api.service on every deploy. Its logs:
+#   sudo journalctl -u sunday-school-api
+[Unit]
+Description=Sunday School Scheduler API
+Documentation=https://github.com/Sunday-School-Software/Sunday-School-Scheduler/blob/main/docs/setup.md#deploy-the-app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# /srv/sunday-school/api links to the current release, so a restart picks up
+# a new one.
+WorkingDirectory=/srv/sunday-school/api
+EnvironmentFile=/etc/sunday-school/api.env
+ExecStart=/usr/bin/node dist/index.js
+
+# Start again after a crash, as often as it takes. 5 seconds apart keeps it
+# under systemd's limit of 5 starts in 10 seconds, which would stop retrying.
+Restart=on-failure
+RestartSec=5s
+
+# A throwaway user made for each start, which can write almost nothing. The
+# API only reads its files and calls AWS with the instance's role.
+DynamicUser=yes
+ProtectHome=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+CapabilityBoundingSet=
+LockPersonality=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

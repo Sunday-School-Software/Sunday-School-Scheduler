@@ -41,6 +41,11 @@ jobs:
       - name: Test
         run: terraform test
 
+      # ShellCheck comes with GitHub's Ubuntu runners. user-data.sh is left out:
+      # it's a Terraform template, not a script, until Terraform fills it in.
+      - name: Check the deploy scripts
+        run: shellcheck deploy.sh install-release.sh
+
       # The same Caddy version user-data.sh installs on the server. fmt fails
       # when the file isn't in Caddy's standard format.
       - name: Check the Caddyfile

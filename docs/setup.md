@@ -14,7 +14,7 @@ This guide takes you from a fresh clone to the app running on your machine. The 
 8. [Create the Cognito user pool](#create-the-cognito-user-pool), in cognito-local or in AWS, and where the IDs go
 9. [Load the seed data](#load-the-seed-data), and which account to sign in with
 10. [Create the server](#create-the-server), the EC2 instance the app runs on, its domain and HTTPS, with Terraform
-11. Deploy (not written yet): ship the app to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
+11. [Deploy the app](#deploy-the-app) to the server with one command, and read the API's logs
 12. [When things go wrong](#when-things-go-wrong)
 
 ## Before you start
@@ -174,7 +174,7 @@ GitHub Actions runs the checks for you on every push to any branch and on every 
 
 API CI and Web CI use Node.js 22 and run these commands, in order, from inside the project's folder: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. The first command that fails stops the run and fails the check. npm downloads are cached using the project's `package-lock.json`.
 
-Infra CI uses Terraform 1.16.2 and runs, from inside `infra/`: `terraform fmt -check -recursive`, `terraform init -backend=false -input=false`, `terraform validate`, `terraform test`. `-backend=false` means it never reads the real state, so it needs no AWS credentials. To fix a formatting failure, run `terraform fmt -recursive` in `infra/`.
+Infra CI uses Terraform 1.16.2 and runs, from inside `infra/`: `terraform fmt -check -recursive`, `terraform init -backend=false -input=false`, `terraform validate`, `terraform test`, then `shellcheck deploy.sh install-release.sh` and Caddy's `fmt` and `validate` on the `Caddyfile`. `-backend=false` means it never reads the real state, so it needs no AWS credentials. To fix a formatting failure, run `terraform fmt -recursive` in `infra/`.
 
 A change that touches nothing in a project doesn't run that project's checks, so a change to only `docs/` runs none of them. On a pull request, the Checks tab shows which workflow ran and which step failed.
 
@@ -261,7 +261,7 @@ Each environment gets its own pool, chosen by `COGNITO_USER_POOL_NAME`:
 | Development and the demo | `sunday-school-dev` | AWS |
 | Production | `sunday-school-prod` | AWS |
 
-Accounts don't move between pools, so an account made while testing never shows up in production. Use the same name for the pool and the [DynamoDB table](#create-the-dynamodb-table) of an environment, so each Cognito user's ID (`user_id` in [the data model](data-model.md)) matches a Person in that environment's table. The production pool is created when the app is deployed ([#30](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/30)). Until then, use the development pool.
+Accounts don't move between pools, so an account made while testing never shows up in production. Use the same name for the pool and the [DynamoDB table](#create-the-dynamodb-table) of an environment, so each Cognito user's ID (`user_id` in [the data model](data-model.md)) matches a Person in that environment's table. Make the production pool before you [create the server](#create-the-server): its IDs go in `infra/terraform.tfvars`, not `api/.env`, and [deploying](#deploy-the-app) gives them to the API on the server.
 
 ### In cognito-local
 
@@ -412,7 +412,7 @@ On its first boot, the instance installs Node.js 22, the version CI tests the AP
 - forwards every request under `/api` to the API on port 3000, with the path unchanged.
 - gets an HTTPS certificate for the domain from Let's Encrypt, renews it on its own, and redirects HTTP to HTTPS.
 
-Putting the app on the server is a separate step (see [Sections](#sections), item 11). Until then, the site answers with a 404.
+Putting the app on the server is a separate step, [Deploy the app](#deploy-the-app). Until then, the site answers with a 404.
 
 ### What you need
 
@@ -420,6 +420,7 @@ Putting the app on the server is a separate step (see [Sections](#sections), ite
 - The [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), signed in with credentials that can manage EC2 instances, security groups, Elastic IPs, IAM roles and instance profiles, and Route 53 records, read SSM parameters, and create an S3 bucket. The config sets its own region (below), so your CLI's default region doesn't matter to it.
 - The [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) for the AWS CLI, to open a shell on the instance.
 - The production table, made with `DYNAMODB_TABLE=sunday-school-prod npm run db:create` (see [Create the DynamoDB table](#in-aws)) in the region you'll use for the server. The role only allows a table in its own region.
+- The production user pool, made with `COGNITO_USER_POOL_NAME=sunday-school-prod npm run cognito:create` in the table's region (see [Create the Cognito user pool](#in-aws-1)). Keep the two IDs it prints for step 1 below.
 
 ### Make the state bucket (once per AWS account)
 
@@ -438,14 +439,14 @@ Never commit a state file. The repository is public, and state lists the account
 
 ### Create it
 
-1. Copy the example settings. Set `domain` to the app's domain and `hosted_zone` to its hosted zone, and check that `table_name` is the production table and `region` is its region:
+1. Copy the example settings. Set `domain` to the app's domain and `hosted_zone` to its hosted zone, check that `table_name` is the production table and `region` is its region, and set `cognito_user_pool_id` and `cognito_client_id` to the production pool's `COGNITO_USER_POOL_ID` and `COGNITO_CLIENT_ID`:
 
    ```sh
    cd infra
    cp terraform.tfvars.example terraform.tfvars
    ```
 
-   `terraform.tfvars` stays out of the repository, like `api/.env`. The server's role, security group and instance are named after the table, such as `sunday-school-prod-server`. Every Terraform command uses the `region` set here, whatever `AWS_REGION` your shell has, so a later apply from another terminal can't build a second server in another region.
+   `terraform.tfvars` stays out of the repository, like `api/.env`. It holds the API's production settings, which a deploy copies to the server, so the repository never does. The server's role, security group and instance are named after the table, such as `sunday-school-prod-server`. Every Terraform command uses the `region` set here, whatever `AWS_REGION` your shell has, so a later apply from another terminal can't build a second server in another region.
 
 2. Connect Terraform to the state bucket (`BUCKET` from the step above). Do this once per clone:
 
@@ -458,17 +459,23 @@ Never commit a state file. The repository is public, and state lists the account
    ```sh
    terraform plan
    terraform apply
-   # Apply complete! Resources: 15 added, 0 changed, 0 destroyed.
+   # Apply complete! Resources: 20 added, 0 changed, 0 destroyed.
    #
    # Outputs:
    #
+   # api_env = <<EOT
+   # AWS_REGION=us-east-1
+   # ...
+   # EOT
    # instance_id = "i-0123456789abcdef0"
    # public_ip = "203.0.113.10"
+   # region = "us-east-1"
+   # release_bucket = "sunday-school-prod-server-releases-123456789012"
    # role_name = "sunday-school-prod-server"
    # url = "https://scheduler.example.org"
    ```
 
-   **Checkpoint:** the apply ends with the four outputs. `terraform output` prints them again at any time.
+   **Checkpoint:** the apply ends with the seven outputs. `terraform output` prints them again at any time.
 
 4. Wait about two minutes for the instance to boot and install Node.js and Caddy, then open a shell on it and check:
 
@@ -497,7 +504,7 @@ Never commit a state file. The repository is public, and state lists the account
    # HTTP/2 404
    ```
 
-   **Checkpoint:** HTTP redirects to HTTPS, and the HTTPS request gets an answer without a certificate error. The 404 is expected until the app is deployed (item 11), and until then `/api` requests get a 502. If the HTTPS request fails, run `sudo journalctl -u caddy --no-pager | tail -20` on the instance: an error that mentions `challenge` usually means the DNS record doesn't point at the instance yet. `dig +short "$DOMAIN"` should print the `public_ip` output. Caddy keeps retrying on its own.
+   **Checkpoint:** HTTP redirects to HTTPS, and the HTTPS request gets an answer without a certificate error. The 404 is expected until you [deploy the app](#deploy-the-app), and until then `/api` requests get a 502. If the HTTPS request fails, run `sudo journalctl -u caddy --no-pager | tail -20` on the instance: an error that mentions `challenge` usually means the DNS record doesn't point at the instance yet. `dig +short "$DOMAIN"` should print the `public_ip` output. Caddy keeps retrying on its own.
 
 Running `terraform apply` again is safe. If nothing in `infra/` has changed, it says `No changes`. Terraform also puts back anything changed outside it. For example, it removes a policy someone added to the role in the console.
 
@@ -510,6 +517,8 @@ terraform apply -replace=aws_instance.server
 ```
 
 The new instance boots from the newest Amazon Linux 2023 image and gets the same Elastic IP. The app is down for a few minutes while this runs, so don't do it on a Sunday morning. Terraform doesn't move to a newer image on its own. It keeps the instance until you replace it.
+
+A new instance has Node.js and Caddy but not the app, so [deploy](#deploy-the-app) once it has booted.
 
 Each new instance gets a new certificate, and Let's Encrypt [issues at most 5](https://letsencrypt.org/docs/rate-limits/) for the same domain in a week. Rebuilding more often than that leaves the site without HTTPS until the week is up.
 
@@ -540,11 +549,77 @@ At on-demand prices in `us-east-1`, for an account outside the free tier:
 | Route 53 hosted zone | $0.50 | $0.50 |
 | **Total** | **about $12.40** | **about $4.80** |
 
-A partial month costs in proportion, so running it only for the weeks the ward uses the app costs a few dollars. `t3.micro` is free-tier eligible, so an account still in its free tier pays little or nothing. The state bucket and the DNS queries cost a few cents at most. Registering the domain is billed separately, once a year. To stop all charges except the hosted zone's and the domain's, tear the server down (below).
+A partial month costs in proportion, so running it only for the weeks the ward uses the app costs a few dollars. `t3.micro` is free-tier eligible, so an account still in its free tier pays little or nothing. The state bucket, the release bucket and the DNS queries cost a few cents at most. Registering the domain is billed separately, once a year. To stop all charges except the hosted zone's and the domain's, tear the server down (below).
 
 ### Tear it down
 
-The Elastic IP is protected, so `terraform destroy` stops with an error instead of giving the address away. To delete everything on purpose, remove the `lifecycle { prevent_destroy = true }` block from `aws_eip.server` in `infra/server.tf`, then run `terraform destroy`. The address is gone for good after that. `terraform destroy` also deletes the domain's DNS record, and the next `terraform apply` creates it again, pointing at the new address. The table, the user pool, the state bucket, the domain and its hosted zone aren't affected.
+The Elastic IP is protected, so `terraform destroy` stops with an error instead of giving the address away. To delete everything on purpose, remove the `lifecycle { prevent_destroy = true }` block from `aws_eip.server` in `infra/server.tf`, then run `terraform destroy`. The address is gone for good after that. `terraform destroy` also deletes the domain's DNS record, and the next `terraform apply` creates it again, pointing at the new address. It deletes the release bucket too, releases and all, since every release can be built again. The table, the user pool, the state bucket, the domain and its hosted zone aren't affected.
+
+## Deploy the app
+
+One command builds the UI and the API from `main` and installs them on the server:
+
+```sh
+infra/deploy.sh
+```
+
+Run it from anywhere in the repository. It takes a few minutes, most of it building.
+
+### What you need
+
+- The server, from [Create the server](#create-the-server), with `terraform init` run in this clone. The deploy reads the server's ID, region and bucket from Terraform's outputs, and the API's production settings from `terraform.tfvars` (through the `api_env` output).
+- Node.js (see [Before you start](#before-you-start)), to build the app on your machine.
+- The AWS CLI, signed in with credentials that can call `ec2:DescribeInstances`, `s3:PutObject` on the `release_bucket` output's bucket, and `ssm:SendCommand` and `ssm:GetCommandInvocation` for the instance and the `AWS-RunShellScript` document.
+- The instance running (`running = true`).
+
+A server created before deploys existed needs two more settings first. Add `cognito_user_pool_id` and `cognito_client_id`, the production pool's IDs, to `infra/terraform.tfvars` (see `terraform.tfvars.example`), then run `terraform apply` in `infra/`. Until you add them, every `terraform plan` and `apply` stops with `No value for required variable`. The apply adds the release bucket and the role's two new policies, and changes nothing else.
+
+### Ship it
+
+```sh
+infra/deploy.sh
+# Building origin/main (20261121T183000Z-8060132)
+# ...
+# Installing 20261121T183000Z-8060132 on i-0123456789abcdef0
+# Installing the API's packages
+# Installed 20261121T183000Z-8060132
+# Deployed 20261121T183000Z-8060132 to https://scheduler.example.org (https://scheduler.example.org/api/health answered 200)
+```
+
+**Checkpoint:** the last line says `/api/health answered 200`. Open the app's address in a browser and sign in.
+
+`infra/deploy.sh <ref>` ships another branch, tag or commit instead, such as `infra/deploy.sh origin/sign-up`. Either way it builds the commit, not your working tree, so uncommitted changes never reach the server. To go back to an earlier version, deploy its commit.
+
+What it does:
+
+1. Fetches from GitHub and copies the commit into a temporary folder with `git archive`.
+2. Runs `npm ci` and `npm run build` in `api/` and `web/` there.
+3. Packs the built API, the built UI, `infra/install-release.sh`, `infra/sunday-school-api.service` and the API's settings into one file, and uploads it to the release bucket. The bucket deletes releases after 30 days.
+4. Uses Systems Manager [Run Command](https://docs.aws.amazon.com/systems-manager/latest/userguide/run-command.html) to have the instance download the release into `/srv/sunday-school/releases/<id>` and run its `install-release.sh` as root. That script installs the API's packages (without development ones), writes the settings to `/etc/sunday-school/api.env`, installs and enables the `sunday-school-api` systemd service, points `/srv/sunday-school/api` and `/srv/sunday-school/web` at the new release, and restarts the API.
+5. Waits for the instance to answer `http://localhost:3000/api/health`, then checks `https://<domain>/api/health` from your machine.
+
+systemd starts the API when the instance boots and starts it again 5 seconds after it crashes, so it comes back on its own. Caddy reads the UI from `/srv/sunday-school/web`, so the new UI is live as soon as the link moves. The instance keeps only the release that's running.
+
+The settings in `/etc/sunday-school/api.env` are `AWS_REGION`, `DYNAMODB_TABLE`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `PORT=3000` (the port the Caddyfile forwards to) and `NODE_ENV=production`. To change one, change `terraform.tfvars`, run `terraform apply`, and deploy again. There are no AWS keys: the API calls DynamoDB with the instance's role, and its Cognito calls (sign-in, sign-up, sign-out) don't need AWS credentials.
+
+### If a deploy fails
+
+If the new API doesn't answer its health check within 30 seconds, `install-release.sh` prints its last 30 log lines, puts the previous release back, restarts it, and the deploy stops with an error. The app keeps running the version it had. Fix the problem, push it, and deploy again. On the very first deploy there's nothing to go back to, so the site's `/api` stays down until a deploy works.
+
+A deploy that fails before the install (a build error, or AWS refusing a call) changes nothing on the server.
+
+### Read the API's logs
+
+The API's output goes to the systemd journal. Open a shell on the instance (see step 4 of [Create it](#create-it)), then:
+
+```sh
+sudo journalctl -u sunday-school-api -n 50 --no-pager   # the last 50 lines
+sudo journalctl -u sunday-school-api -f                 # follow new lines; Ctrl+C to stop
+sudo journalctl -u sunday-school-api --since "1 hour ago"
+systemctl status sunday-school-api                      # running or not, and since when
+```
+
+The API logs each failed request with what went wrong, as it does locally (see [When things go wrong](#when-things-go-wrong)). The journal also shows each restart after a crash.
 
 ## When things go wrong
 
@@ -565,4 +640,8 @@ The Elastic IP is protected, so `terraform destroy` stops with an error instead 
 - **`terraform init` says the S3 bucket does not exist.** Make the [state bucket](#make-the-state-bucket-once-per-aws-account) first, and check that `BUCKET` and `AWS_REGION` in your shell match it. They're shell variables, so a new terminal needs them set again.
 - **`terraform apply` fails with `EntityAlreadyExists` for the role or instance profile.** The server already exists, but this Terraform can't see its state, usually because `terraform init` was given a different bucket. Run `terraform init -reconfigure` with the right bucket. Don't delete the existing role to get past the error.
 - **`aws ssm start-session` says `SessionManagerPlugin is not found`.** Install the [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) and open a new terminal.
+- **`infra/deploy.sh` says it couldn't read a Terraform output.** Terraform's own error is printed just above it. If it mentions credentials or an expired session, sign the AWS CLI in again. If it asks for `terraform init`, run step 2 of [Create it](#create-it) in this clone. If it says the output isn't found, the server hasn't been applied since deploys were added (see [What you need](#what-you-need-1)). Then deploy again.
+- **`infra/deploy.sh` says the server is `stopped`.** Set `running = true` in `terraform.tfvars`, run `terraform apply`, wait a minute, and deploy again.
+- **`infra/deploy.sh` stops at `send-command` with `InvalidInstanceId`.** The instance's agent hasn't checked in with Systems Manager, usually because it has just started. Wait a minute and try again.
+- **`infra/deploy.sh` says another deploy is running on the server.** Someone else's deploy, or one you stopped with Ctrl+C, is still installing. Wait a few minutes and deploy again.
 - **`aws ssm start-session` says `TargetNotConnected`.** The instance hasn't finished booting, or its agent hasn't checked in yet. Wait a minute and try again. If it still fails after five minutes, rebuild the instance (see [Rebuild the instance](#rebuild-the-instance)).
