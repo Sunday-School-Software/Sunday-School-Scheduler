@@ -13,8 +13,8 @@ This guide takes you from a fresh clone to the app running on your machine. The 
 7. [Create the DynamoDB table](#create-the-dynamodb-table), in DynamoDB Local or in AWS
 8. [Create the Cognito user pool](#create-the-cognito-user-pool), in cognito-local or in AWS, and where the IDs go
 9. [Load the seed data](#load-the-seed-data), and which account to sign in with
-10. [Create the server](#create-the-server), the EC2 instance the app runs on, with Terraform
-11. Deploy (not written yet): serve the app over HTTPS ([#43](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/43)), ship it to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
+10. [Create the server](#create-the-server), the EC2 instance the app runs on, its domain and HTTPS, with Terraform
+11. Deploy (not written yet): ship the app to the server and read the API's logs ([#44](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/44))
 12. [When things go wrong](#when-things-go-wrong)
 
 ## Before you start
@@ -154,7 +154,7 @@ Put a test next to the file it tests and name it `<file>.test.ts` (or `.test.tsx
 
 Import `describe`, `it`, `expect` and `jest` from `@jest/globals`, so TypeScript knows their types. Jest still sets them as globals too, and React Testing Library relies on that to clean up after each test, so don't turn the globals off. To run one file, or rerun tests when files change, pass Jest options after `--`, for example `npm test -- src/App.test.tsx` or `npm test -- --watch`.
 
-The Terraform config in `infra/` has its own tests, which check the server's network rules and its role's permissions against a fake AWS provider. They need [Terraform](https://developer.hashicorp.com/terraform/install) 1.10 or later, but no AWS account, and nothing is created:
+The Terraform config in `infra/` has its own tests, which check the server's network rules, its role's permissions, the domain's DNS record and the Caddy setup against a fake AWS provider. They need [Terraform](https://developer.hashicorp.com/terraform/install) 1.10 or later, but no AWS account, and nothing is created:
 
 ```sh
 (cd infra && terraform init -backend=false && terraform test)
@@ -401,14 +401,21 @@ In production, the app runs on one EC2 instance (see [the design](design.md#host
 
 - **An IAM role** that can read and write items in the app's table and its indexes, and nothing else in DynamoDB. The API gets its AWS access from this role, so no AWS keys go on the instance. The role also has the five permissions [Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html) needs to give you a shell.
 - **A security group** that lets in only HTTP (port 80) and HTTPS (port 443), from anywhere. Port 22 is closed, so there's no SSH. You get a shell through Session Manager instead.
-- **An Elastic IP**, a fixed public address for the domain's DNS record ([#43](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/43)). It stays the same when the instance is rebuilt.
+- **An Elastic IP**, a fixed public address for the domain. It stays the same when the instance is rebuilt.
+- **A DNS record** in Route 53 that points the app's domain at the Elastic IP.
 
-On its first boot, the instance installs Node.js 22, the version CI tests the API with. Putting the app on it is a separate step (see [Sections](#sections), item 11).
+On its first boot, the instance installs Node.js 22, the version CI tests the API with, and [Caddy](https://caddyserver.com/docs/), the web server in front of the app. `user-data.sh` downloads a pinned Caddy release from GitHub, checks it against the release's SHA-512 checksum, and installs `infra/Caddyfile` as Caddy's config. That config:
+
+- serves the UI's built bundle from `/srv/sunday-school/web`. Any path that isn't a file there, such as `/dashboard`, gets `index.html`, so refreshing a page or opening a link to it shows the app instead of a 404.
+- forwards every request under `/api` to the API on port 3000, with the path unchanged.
+- gets an HTTPS certificate for the domain from Let's Encrypt, renews it on its own, and redirects HTTP to HTTPS.
+
+Putting the app on the server is a separate step (see [Sections](#sections), item 11). Until then, the site answers with a 404.
 
 ### What you need
 
 - [Terraform](https://developer.hashicorp.com/terraform/install) 1.10 or later. Run `terraform version` to check.
-- The [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), signed in with credentials that can manage EC2 instances, security groups, Elastic IPs, IAM roles and instance profiles, read SSM parameters, and create an S3 bucket. The config sets its own region (below), so your CLI's default region doesn't matter to it.
+- The [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), signed in with credentials that can manage EC2 instances, security groups, Elastic IPs, IAM roles and instance profiles, and Route 53 records, read SSM parameters, and create an S3 bucket. The config sets its own region (below), so your CLI's default region doesn't matter to it.
 - The [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) for the AWS CLI, to open a shell on the instance.
 - The production table, made with `DYNAMODB_TABLE=sunday-school-prod npm run db:create` (see [Create the DynamoDB table](#in-aws)) in the region you'll use for the server. The role only allows a table in its own region.
 
@@ -429,7 +436,7 @@ Never commit a state file. The repository is public, and state lists the account
 
 ### Create it
 
-1. Copy the example settings, and check that `table_name` is the production table and `region` is its region:
+1. Copy the example settings. Set `domain` to the app's domain and `hosted_zone` to its hosted zone, and check that `table_name` is the production table and `region` is its region:
 
    ```sh
    cd infra
@@ -449,30 +456,46 @@ Never commit a state file. The repository is public, and state lists the account
    ```sh
    terraform plan
    terraform apply
-   # Apply complete! Resources: 14 added, 0 changed, 0 destroyed.
+   # Apply complete! Resources: 15 added, 0 changed, 0 destroyed.
    #
    # Outputs:
    #
    # instance_id = "i-0123456789abcdef0"
    # public_ip = "203.0.113.10"
    # role_name = "sunday-school-prod-server"
+   # url = "https://scheduler.example.org"
    ```
 
-   **Checkpoint:** the apply ends with the three outputs. `terraform output` prints them again at any time.
+   **Checkpoint:** the apply ends with the four outputs. `terraform output` prints them again at any time.
 
-4. Wait about two minutes for the instance to boot and install Node.js, then open a shell on it and check:
+4. Wait about two minutes for the instance to boot and install Node.js and Caddy, then open a shell on it and check:
 
    ```sh
    aws ssm start-session --target "$(terraform output -raw instance_id)"
    # on the instance:
    node --version
    # v22...
+   systemctl is-active caddy
+   # active
    exit
    ```
 
    The AWS CLI uses `AWS_REGION` or its own default region, not Terraform's, so in a new terminal add `--region` with the server's region if they differ.
 
-   **Checkpoint:** `node --version` prints a version starting with `v22`. The shell runs as `ssm-user`, which can use `sudo`. If it printed nothing or an error, `sudo cat /var/log/cloud-init-output.log` shows what happened at boot.
+   **Checkpoint:** `node --version` prints a version starting with `v22`, and `systemctl is-active caddy` prints `active`. The shell runs as `ssm-user`, which can use `sudo`. If either printed nothing or an error, `sudo cat /var/log/cloud-init-output.log` shows what happened at boot.
+
+5. Check that the domain answers over HTTPS. Caddy gets its certificate within a minute or two of starting:
+
+   ```sh
+   DOMAIN=scheduler.example.org   # the domain in terraform.tfvars
+   curl -sI "http://$DOMAIN" | grep -i -e '^HTTP' -e '^location'
+   # HTTP/1.1 308 Permanent Redirect
+   # Location: https://scheduler.example.org/
+   curl -sI "https://$DOMAIN" | head -1
+   # HTTP/2 404
+   ```
+
+   **Checkpoint:** HTTP redirects to HTTPS, and the HTTPS request gets an answer without a certificate error. The 404 is expected until the app is deployed (item 11), and until then `/api` requests get a 502. If the HTTPS request fails, run `sudo journalctl -u caddy --no-pager | tail -20` on the instance: an error that mentions `challenge` usually means the DNS record doesn't point at the instance yet. `dig +short "$DOMAIN"` should print the `public_ip` output. Caddy keeps retrying on its own.
 
 Running `terraform apply` again is safe. If nothing in `infra/` has changed, it says `No changes`. Terraform also puts back anything changed outside it. For example, it removes a policy someone added to the role in the console.
 
@@ -486,7 +509,9 @@ terraform apply -replace=aws_instance.server
 
 The new instance boots from the newest Amazon Linux 2023 image and gets the same Elastic IP. The app is down for a few minutes while this runs, so don't do it on a Sunday morning. Terraform doesn't move to a newer image on its own. It keeps the instance until you replace it.
 
-Changing `infra/user-data.sh` also replaces the instance on the next apply, because the script runs only on an instance's first boot. Anyone who can view the instance in AWS can read that script, so never put a secret in it.
+Each new instance gets a new certificate, and Let's Encrypt [issues at most 5](https://letsencrypt.org/docs/rate-limits/) for the same domain in a week. Rebuilding more often than that leaves the site without HTTPS until the week is up.
+
+Changing `infra/user-data.sh`, `infra/Caddyfile` or `domain` also replaces the instance on the next apply, because the script that installs them runs only on an instance's first boot. Anyone who can view the instance in AWS can read that script, so never put a secret in it.
 
 ### Stop it when nobody needs the app
 
@@ -499,7 +524,7 @@ terraform apply
 
 A stopped instance keeps its disk, Elastic IP and certificate, so nothing else changes. Set `running = true` and apply again to start it. The app is back about a minute later. While it's stopped, the app is down for everyone, including teachers who click a link in an email, so keep it running while the ward uses the app.
 
-Change the setting in `terraform.tfvars`, not with `-var` on the command line: the next apply without `-var` would flip it back. Keep `running = true` when the instance is created or replaced, so it can finish installing Node.js on its first boot. The install runs only once, so stopping the instance partway through leaves it without Node.js until it's replaced.
+Change the setting in `terraform.tfvars`, not with `-var` on the command line: the next apply without `-var` would flip it back. Keep `running = true` when the instance is created or replaced, so it can finish installing Node.js and Caddy on its first boot. The install runs only once, so stopping the instance partway through leaves it without them, and the site down, until it's replaced.
 
 ### What it costs
 
@@ -510,13 +535,14 @@ At on-demand prices in `us-east-1`, for an account outside the free tier:
 | `t3.micro` instance | about $7.60 | $0 |
 | Elastic IP (AWS charges for every public IPv4 address) | about $3.65 | about $3.65 |
 | 8 GB disk | about $0.65 | about $0.65 |
-| **Total** | **about $11.90** | **about $4.30** |
+| Route 53 hosted zone | $0.50 | $0.50 |
+| **Total** | **about $12.40** | **about $4.80** |
 
-A partial month costs in proportion, so running it only for the weeks the ward uses the app costs a few dollars. `t3.micro` is free-tier eligible, so an account still in its free tier pays little or nothing. The state bucket costs a few cents at most. To stop all charges, tear the server down (below).
+A partial month costs in proportion, so running it only for the weeks the ward uses the app costs a few dollars. `t3.micro` is free-tier eligible, so an account still in its free tier pays little or nothing. The state bucket and the DNS queries cost a few cents at most. Registering the domain is billed separately, once a year. To stop all charges except the hosted zone's and the domain's, tear the server down (below).
 
 ### Tear it down
 
-The Elastic IP is protected, so `terraform destroy` stops with an error instead of giving the address away. To delete everything on purpose, remove the `lifecycle { prevent_destroy = true }` block from `aws_eip.server` in `infra/server.tf`, then run `terraform destroy`. The address is gone for good after that, so the domain's DNS record has to change. The table, the user pool and the state bucket aren't affected.
+The Elastic IP is protected, so `terraform destroy` stops with an error instead of giving the address away. To delete everything on purpose, remove the `lifecycle { prevent_destroy = true }` block from `aws_eip.server` in `infra/server.tf`, then run `terraform destroy`. The address is gone for good after that. `terraform destroy` also deletes the domain's DNS record, and the next `terraform apply` creates it again, pointing at the new address. The table, the user pool, the state bucket, the domain and its hosted zone aren't affected.
 
 ## When things go wrong
 

@@ -1,5 +1,6 @@
-# Checks the server's network rules and its role's permissions, the two things
-# issue #42's acceptance criteria limit, and the switch that stops it. Runs against a fake AWS provider: no
+# Checks the server's network rules and its role's permissions (what issue
+# #42's acceptance criteria limit), the switch that stops it, and the domain's
+# DNS record and Caddy setup (#43). Runs against a fake AWS provider: no
 # credentials, and nothing is created. Run from infra/:
 #   terraform init -backend=false
 #   terraform test
@@ -13,12 +14,87 @@ mock_provider "aws" {
   mock_data "aws_ssm_parameter" {
     defaults = { insecure_value = "ami-0123456789abcdef0" }
   }
+  mock_data "aws_route53_zone" {
+    defaults = { zone_id = "Z0123456789EXAMPLE" }
+  }
+}
+
+# The Elastic IP's address is only known after an apply, so give it one here.
+override_resource {
+  target          = aws_eip.server
+  override_during = plan
+  values          = { public_ip = "203.0.113.10" }
 }
 
 variables {
-  region     = "us-east-1"
-  running    = true
-  table_name = "sunday-school-test"
+  domain      = "scheduler.example.org"
+  hosted_zone = "example.org"
+  region      = "us-east-1"
+  running     = true
+  table_name  = "sunday-school-test"
+}
+
+run "dns" {
+  command = plan
+
+  assert {
+    condition     = aws_route53_record.app.zone_id == "Z0123456789EXAMPLE" && aws_route53_record.app.name == "scheduler.example.org"
+    error_message = "The DNS record should be the domain, in its hosted zone."
+  }
+  assert {
+    condition     = aws_route53_record.app.type == "A" && aws_route53_record.app.records == toset(["203.0.113.10"])
+    error_message = "The domain should point at the Elastic IP."
+  }
+  assert {
+    condition     = output.url == "https://scheduler.example.org"
+    error_message = "The url output should be the domain over HTTPS."
+  }
+}
+
+run "caddy" {
+  command = plan
+
+  assert {
+    condition     = strcontains(aws_instance.server.user_data, file("Caddyfile"))
+    error_message = "The user data should install the repository's Caddyfile unchanged."
+  }
+  assert {
+    condition     = strcontains(aws_instance.server.user_data, "Environment=DOMAIN=scheduler.example.org\n")
+    error_message = "Caddy should be told the domain."
+  }
+}
+
+run "domain_outside_zone" {
+  command = plan
+
+  variables {
+    domain = "scheduler.example.com"
+  }
+
+  expect_failures = [var.hosted_zone]
+}
+
+run "domain_with_scheme" {
+  command = plan
+
+  variables {
+    domain = "https://scheduler.example.org"
+  }
+
+  expect_failures = [var.domain]
+}
+
+run "domain_is_zone" {
+  command = plan
+
+  variables {
+    domain = "example.org"
+  }
+
+  assert {
+    condition     = aws_route53_record.app.name == "example.org"
+    error_message = "The domain can be the hosted zone itself."
+  }
 }
 
 run "network" {

@@ -40,3 +40,10 @@ jobs:
 
       - name: Test
         run: terraform test
+
+      # The same Caddy version user-data.sh installs on the server. fmt fails
+      # when the file isn't in Caddy's standard format.
+      - name: Check the Caddyfile
+        run: |
+          docker run --rm -e DOMAIN=scheduler.example.org -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.11.9 sh -c 'caddy fmt --diff /etc/caddy/Caddyfile && caddy validate --config /etc/caddy/Caddyfile'

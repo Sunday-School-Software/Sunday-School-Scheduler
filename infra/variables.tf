@@ -1,3 +1,23 @@
+variable "domain" {
+  description = "The app's domain, such as scheduler.example.org. Caddy gets an HTTPS certificate for it, and a DNS record in hosted_zone points it at the server."
+  type        = string
+
+  validation {
+    condition     = can(regex("^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$", var.domain))
+    error_message = "Set domain to a lowercase domain name such as scheduler.example.org, without https:// or a trailing dot."
+  }
+}
+
+variable "hosted_zone" {
+  description = "The Route 53 public hosted zone the domain is in, such as example.org. Registering the domain with Route 53 creates it."
+  type        = string
+
+  validation {
+    condition     = var.domain == var.hosted_zone || endswith(var.domain, ".${var.hosted_zone}")
+    error_message = "Set hosted_zone to the zone domain is in: example.org for scheduler.example.org or for example.org itself."
+  }
+}
+
 variable "region" {
   description = "The AWS region the table is in, such as us-east-1. The server is created there too."
   type        = string
