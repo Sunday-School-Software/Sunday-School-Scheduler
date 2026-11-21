@@ -40,4 +40,5 @@ Hours logged as I work, starting 11/18/2026.
 | 11/19/2026 | Worked out the server's monthly cost, added a setting that stops the instance when nobody needs the app, and created the production table and server in AWS and checked them | 1 |
 | 11/20/2026 | Set up Caddy to serve the app over HTTPS and pointed the domain at the server with a Route 53 record; tested it locally, then put it on the live server at sunday-school.echowebprogramming.click and checked HTTPS, the redirect and page refreshes | 1 |
 | 11/20/2026 | Built sign-up (#69): the sign-up and verify-email pages, the API routes and Cognito calls behind them, and a new teacher Person for each new account; tested it end to end against cognito-local and DynamoDB Local, then reviewed the pull request in chunks and ran it locally | 1.5 |
-| **Total** | | **5** |
+| 11/20/2026 | Requested SES production access so the pilot can email real teachers, and confirmed AWS granted it | 0.25 |
+| **Total** | | **5.25** |
