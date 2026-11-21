@@ -116,8 +116,8 @@ describe("Dashboard", () => {
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
-  it("shows the API's message for a client error", async () => {
-    const message = "Leaders can only see this.";
+  it("shows the API's message for a 4xx response", async () => {
+    const message = "A message from the API.";
     mockFetch(403, { error: message });
 
     renderDashboard();

@@ -248,8 +248,8 @@ describe("ServerFacade", () => {
       await expect(facade.listAssignments("token-123")).rejects.toThrow(UnauthorizedError);
     });
 
-    it("throws the API's message for a 403", async () => {
-      const message = "Leaders can only see this.";
+    it("throws the API's message for a 4xx response", async () => {
+      const message = "A message from the API.";
       mockFetch(403, { error: message });
 
       const error = await facade.listAssignments("token-123").catch((e: unknown) => e);
