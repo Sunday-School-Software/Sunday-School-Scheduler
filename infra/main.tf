@@ -1,5 +1,6 @@
 # The EC2 instance the app runs on, its IAM role, security group, Elastic IP
-# and DNS record. docs/setup.md ("Create the server") explains how to run this.
+# and DNS record, and the domain's SES identity for sending email.
+# docs/setup.md ("Create the server") explains how to run this.
 
 terraform {
   required_version = ">= 1.10"

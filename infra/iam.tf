@@ -64,6 +64,23 @@ resource "aws_iam_role_policy" "session_manager" {
   })
 }
 
+# Sends email (simple, raw or templated, through the SES v2 API) from the
+# app's domain only (email.tf), and nothing else in SES: no other sender, no
+# account or identity changes.
+resource "aws_iam_role_policy" "email" {
+  name = "email"
+  role = aws_iam_role.server.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "ses:SendEmail"
+      Resource = aws_sesv2_email_identity.app.arn
+    }]
+  })
+}
+
 # The role has only the policies above. An apply removes any managed or inline
 # policy added to it some other way, such as in the console.
 resource "aws_iam_role_policy_attachments_exclusive" "server" {
@@ -72,8 +89,12 @@ resource "aws_iam_role_policy_attachments_exclusive" "server" {
 }
 
 resource "aws_iam_role_policies_exclusive" "server" {
-  role_name    = aws_iam_role.server.name
-  policy_names = [aws_iam_role_policy.table.name, aws_iam_role_policy.session_manager.name]
+  role_name = aws_iam_role.server.name
+  policy_names = [
+    aws_iam_role_policy.table.name,
+    aws_iam_role_policy.session_manager.name,
+    aws_iam_role_policy.email.name,
+  ]
 }
 
 resource "aws_iam_instance_profile" "server" {
