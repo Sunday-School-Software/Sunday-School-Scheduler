@@ -1,7 +1,7 @@
 # Checks the server's network rules and its role's permissions (what issue
 # #42's acceptance criteria limit), the switch that stops it, the domain's DNS
-# record and Caddy setup (#43), and the release bucket and API settings that
-# deploy.sh uses (#44). Runs against a fake AWS provider: no
+# record and Caddy setup (#43), its SES identity (#99), and the release bucket
+# and API settings that deploy.sh uses (#44). Runs against a fake AWS provider: no
 # credentials, and nothing is created. Run from infra/:
 #   terraform init -backend=false
 #   terraform test
@@ -25,6 +25,16 @@ override_resource {
   target          = aws_eip.server
   override_during = plan
   values          = { public_ip = "203.0.113.10" }
+}
+
+# SES makes the identity's ARN and DKIM tokens when it's created.
+override_resource {
+  target          = aws_sesv2_email_identity.app
+  override_during = plan
+  values = {
+    arn                     = "arn:aws:ses:us-east-1:123456789012:identity/scheduler.example.org"
+    dkim_signing_attributes = { tokens = ["token1", "token2", "token3"] }
+  }
 }
 
 variables {
@@ -64,6 +74,27 @@ run "caddy" {
   assert {
     condition     = strcontains(aws_instance.server.user_data, "Environment=DOMAIN=scheduler.example.org\n")
     error_message = "Caddy should be told the domain."
+  }
+}
+
+run "email" {
+  command = plan
+
+  assert {
+    condition     = aws_sesv2_email_identity.app.email_identity == "scheduler.example.org"
+    error_message = "The SES identity should be the app's domain."
+  }
+  assert {
+    condition     = alltrue([for record in aws_route53_record.dkim : record.zone_id == "Z0123456789EXAMPLE" && record.type == "CNAME"])
+    error_message = "The DKIM records should be CNAMEs in the domain's hosted zone."
+  }
+  assert {
+    condition = [for record in aws_route53_record.dkim : [record.name, record.records]] == [
+      ["token1._domainkey.scheduler.example.org", toset(["token1.dkim.amazonses.com"])],
+      ["token2._domainkey.scheduler.example.org", toset(["token2.dkim.amazonses.com"])],
+      ["token3._domainkey.scheduler.example.org", toset(["token3.dkim.amazonses.com"])],
+    ]
+    error_message = "Each DKIM token should get a record pointing at SES's key for it."
   }
 }
 
@@ -224,12 +255,21 @@ run "role" {
   }
 
   assert {
+    condition = jsondecode(aws_iam_role_policy.email.policy).Statement == [{
+      Effect   = "Allow"
+      Action   = "ses:SendEmail"
+      Resource = "arn:aws:ses:us-east-1:123456789012:identity/scheduler.example.org"
+    }]
+    error_message = "The email policy should allow only sending email from the app's domain."
+  }
+
+  assert {
     condition     = length(aws_iam_role_policy_attachments_exclusive.server.policy_arns) == 0
     error_message = "The role should have no managed policies."
   }
   assert {
-    condition     = toset(aws_iam_role_policies_exclusive.server.policy_names) == toset(["table", "session-manager", "run-command", "releases"])
-    error_message = "The role should have only the table, Session Manager, Run Command and releases policies."
+    condition     = toset(aws_iam_role_policies_exclusive.server.policy_names) == toset(["table", "session-manager", "run-command", "releases", "email"])
+    error_message = "The role should have only the table, Session Manager, Run Command, releases and email policies."
   }
 }
 

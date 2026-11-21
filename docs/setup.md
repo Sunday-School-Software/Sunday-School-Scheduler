@@ -13,7 +13,7 @@ This guide takes you from a fresh clone to the app running on your machine. The 
 7. [Create the DynamoDB table](#create-the-dynamodb-table), in DynamoDB Local or in AWS
 8. [Create the Cognito user pool](#create-the-cognito-user-pool), in cognito-local or in AWS, and where the IDs go
 9. [Load the seed data](#load-the-seed-data), and which account to sign in with
-10. [Create the server](#create-the-server), the EC2 instance the app runs on, its domain and HTTPS, with Terraform
+10. [Create the server](#create-the-server), the EC2 instance the app runs on, its domain, HTTPS and email, with Terraform
 11. [Deploy the app](#deploy-the-app) to the server with one command, and read the API's logs
 12. [When things go wrong](#when-things-go-wrong)
 
@@ -401,10 +401,11 @@ The seed data is made up. Never put real ward members' names or email addresses 
 
 In production, the app runs on one EC2 instance (see [the design](design.md#hosting)). The [Terraform](https://developer.hashicorp.com/terraform) config in `infra/` creates it, along with:
 
-- **An IAM role** that can read and write items in the app's table and its indexes, and nothing else in DynamoDB. The API gets its AWS access from this role, so no AWS keys go on the instance. The role also has the five permissions [Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html) needs to give you a shell.
+- **An IAM role** that can read and write items in the app's table and its indexes, and nothing else in DynamoDB. The API gets its AWS access from this role, so no AWS keys go on the instance. It can also send email from the app's domain through SES, and do nothing else in SES. The role also has the five permissions [Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html) needs to give you a shell.
 - **A security group** that lets in only HTTP (port 80) and HTTPS (port 443), from anywhere. Port 22 is closed, so there's no SSH. You get a shell through Session Manager instead.
 - **An Elastic IP**, a fixed public address for the domain. It stays the same when the instance is rebuilt.
 - **A DNS record** in Route 53 that points the app's domain at the Elastic IP.
+- **An SES identity** for the domain, so the app can send email from it, and the three DKIM records in Route 53 that SES uses to verify the domain and sign its email. Mail servers check that signature, so the app's email is less likely to land in spam.
 
 On its first boot, the instance installs Node.js 22, the version CI tests the API with, and [Caddy](https://caddyserver.com/docs/), the web server in front of the app. `user-data.sh` downloads a pinned Caddy release from GitHub, checks it against the release's SHA-512 checksum, and installs `infra/Caddyfile` as Caddy's config. That config:
 
@@ -417,7 +418,7 @@ Putting the app on the server is a separate step, [Deploy the app](#deploy-the-a
 ### What you need
 
 - [Terraform](https://developer.hashicorp.com/terraform/install) 1.10 or later. Run `terraform version` to check.
-- The [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), signed in with credentials that can manage EC2 instances, security groups, Elastic IPs, IAM roles and instance profiles, and Route 53 records, read SSM parameters, and create an S3 bucket. The config sets its own region (below), so your CLI's default region doesn't matter to it.
+- The [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), signed in with credentials that can manage EC2 instances, security groups, Elastic IPs, IAM roles and instance profiles, Route 53 records, and SES identities, read SSM parameters, and create an S3 bucket. The config sets its own region (below), so your CLI's default region doesn't matter to it.
 - The [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) for the AWS CLI, to open a shell on the instance.
 - The production table, made with `DYNAMODB_TABLE=sunday-school-prod npm run db:create` (see [Create the DynamoDB table](#in-aws)) in the region you'll use for the server. The role only allows a table in its own region.
 - The production user pool, made with `COGNITO_USER_POOL_NAME=sunday-school-prod npm run cognito:create` in the table's region (see [Create the Cognito user pool](#in-aws-1)). Keep the two IDs it prints for step 1 below.
@@ -459,7 +460,7 @@ Never commit a state file. The repository is public, and state lists the account
    ```sh
    terraform plan
    terraform apply
-   # Apply complete! Resources: 20 added, 0 changed, 0 destroyed.
+   # Apply complete! Resources: 25 added, 0 changed, 0 destroyed.
    #
    # Outputs:
    #
@@ -506,7 +507,36 @@ Never commit a state file. The repository is public, and state lists the account
 
    **Checkpoint:** HTTP redirects to HTTPS, and the HTTPS request gets an answer without a certificate error. The 404 is expected until you [deploy the app](#deploy-the-app), and until then `/api` requests get a 502. If the HTTPS request fails, run `sudo journalctl -u caddy --no-pager | tail -20` on the instance: an error that mentions `challenge` usually means the DNS record doesn't point at the instance yet. `dig +short "$DOMAIN"` should print the `public_ip` output. Caddy keeps retrying on its own.
 
+6. Check that SES has verified the domain. It does that on its own once it finds the DKIM records, usually within a few minutes:
+
+   ```sh
+   aws sesv2 get-email-identity --email-identity "$DOMAIN" \
+     --query '[VerifiedForSendingStatus, DkimAttributes.Status]' --output text
+   # True	SUCCESS
+   ```
+
+   **Checkpoint:** it prints `True` and `SUCCESS`. While it prints `False` and `PENDING`, SES is still looking for the records. It keeps looking for 72 hours, then gives up and prints `FAILED`. If that happens, check that the records resolve (`terraform state show 'aws_route53_record.dkim[0]'` shows one record's name, and `dig +short CNAME <name>` should print a value ending in `dkim.amazonses.com`), then run `terraform apply -replace=aws_sesv2_email_identity.app` to start again with a new identity.
+
 Running `terraform apply` again is safe. If nothing in `infra/` has changed, it says `No changes`. Terraform also puts back anything changed outside it. For example, it removes a policy someone added to the role in the console.
+
+### Leave the SES sandbox (once per AWS account)
+
+A new AWS account's SES is in the *sandbox*. There it sends only to addresses verified in SES, and at most 200 emails a day, so teachers and leaders wouldn't get the app's email. Production access lifts both limits. AWS grants it to the whole account, but separately in each region, so it's needed once in the server's region. To see whether the account has it:
+
+```sh
+aws sesv2 get-account --query ProductionAccessEnabled
+# true
+```
+
+If it prints `false`, ask for it, either with the **Request production access** button in the SES console or with this command, which asks the same questions:
+
+```sh
+aws sesv2 put-account-details --production-access-enabled --mail-type TRANSACTIONAL \
+  --website-url "https://$DOMAIN" --contact-language EN \
+  --use-case-description "Notifications for a ward's Sunday School schedule: a teacher gets an email when they're assigned a class, and leaders get one when a teacher responds. Only people the ward adds to the app get email."
+```
+
+AWS answers by email to the account's address, usually within a day. If it asks for more detail, reply to that email. Test the app's email only after AWS grants it: in the sandbox, SES also checks the server's permission to send to each recipient's identity, and the role is allowed only the domain, so even verified addresses get an `AccessDenied` error.
 
 ### Rebuild the instance
 
@@ -547,13 +577,14 @@ At on-demand prices in `us-east-1`, for an account outside the free tier:
 | Elastic IP (AWS charges for every public IPv4 address) | about $3.65 | about $3.65 |
 | 8 GB disk | about $0.65 | about $0.65 |
 | Route 53 hosted zone | $0.50 | $0.50 |
+| Email through SES ($0.10 per 1,000) | a few cents | $0 |
 | **Total** | **about $12.40** | **about $4.80** |
 
 A partial month costs in proportion, so running it only for the weeks the ward uses the app costs a few dollars. `t3.micro` is free-tier eligible, so an account still in its free tier pays little or nothing. The state bucket, the release bucket and the DNS queries cost a few cents at most. Registering the domain is billed separately, once a year. To stop all charges except the hosted zone's and the domain's, tear the server down (below).
 
 ### Tear it down
 
-The Elastic IP is protected, so `terraform destroy` stops with an error instead of giving the address away. To delete everything on purpose, remove the `lifecycle { prevent_destroy = true }` block from `aws_eip.server` in `infra/server.tf`, then run `terraform destroy`. The address is gone for good after that. `terraform destroy` also deletes the domain's DNS record, and the next `terraform apply` creates it again, pointing at the new address. It deletes the release bucket too, releases and all, since every release can be built again. The table, the user pool, the state bucket, the domain and its hosted zone aren't affected.
+The Elastic IP is protected, so `terraform destroy` stops with an error instead of giving the address away. To delete everything on purpose, remove the `lifecycle { prevent_destroy = true }` block from `aws_eip.server` in `infra/server.tf`, then run `terraform destroy`. The address is gone for good after that. `terraform destroy` also deletes the domain's DNS record and its SES identity, and the next `terraform apply` creates them again: the record points at the new address, and SES verifies the domain again (step 6 of [Create it](#create-it)). It deletes the release bucket too, releases and all, since every release can be built again. The account keeps its production access. The table, the user pool, the state bucket, the domain and its hosted zone aren't affected.
 
 ## Deploy the app
 
@@ -572,7 +603,7 @@ Run it from anywhere in the repository. It takes a few minutes, most of it build
 - The AWS CLI, signed in with credentials that can call `ec2:DescribeInstances`, `s3:PutObject` on the `release_bucket` output's bucket, and `ssm:SendCommand` and `ssm:GetCommandInvocation` for the instance and the `AWS-RunShellScript` document.
 - The instance running (`running = true`).
 
-A server created before deploys existed needs two more settings first. Add `cognito_user_pool_id` and `cognito_client_id`, the production pool's IDs, to `infra/terraform.tfvars` (see `terraform.tfvars.example`), then run `terraform apply` in `infra/`. Until you add them, every `terraform plan` and `apply` stops with `No value for required variable`. The apply adds the release bucket and the role's two new policies, and changes nothing else.
+A server created before deploys existed needs two more settings first. Add `cognito_user_pool_id` and `cognito_client_id`, the production pool's IDs, to `infra/terraform.tfvars` (see `terraform.tfvars.example`), then run `terraform apply` in `infra/`. Until you add them, every `terraform plan` and `apply` stops with `No value for required variable`. The apply adds the release bucket and the role's two new policies.
 
 ### Ship it
 

@@ -1,5 +1,6 @@
 # The EC2 instance the app runs on, its IAM role, security group, Elastic IP
-# and DNS record, and the bucket deploy.sh ships releases through.
+# and DNS record, the domain's SES identity for sending email, and the bucket
+# deploy.sh ships releases through.
 # docs/setup.md ("Create the server") explains how to run this.
 
 terraform {

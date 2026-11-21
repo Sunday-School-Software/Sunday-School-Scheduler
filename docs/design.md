@@ -5,7 +5,7 @@
 | **Authors** | Hyrum Kammerman |
 | **Reviewers** | [who reviewed it — a teammate, the instructor, a design-review partner] |
 | **Status** | In review |
-| **Last updated** | 2026-11-18 |
+| **Last updated** | 2026-11-21 |
 | **Links** | [Proposal](https://docs.google.com/document/d/19jYz_kN3rfb-afqCQExlSvgMchcfi33fQDmuWVzpjow/edit?usp=sharing) · [Repository](https://github.com/Sunday-School-Software/Sunday-School-Scheduler) · [Issue tracker](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues) |
 
 ## Revision history
@@ -27,6 +27,7 @@ Details for each revision are in the commit messages (`git log docs/design.md`).
 | 2026-11-18 | Hyrum Kammerman | Texts through AWS End User Messaging in a new Milestone 3, after the MVP: each person picks email or text (§2–§8) |
 | 2026-11-18 | Hyrum Kammerman | §4: Terraform creates the server, and shell access goes through Session Manager instead of SSH |
 | 2026-11-20 | Hyrum Kammerman | §4: Terraform also creates the domain's DNS record and installs Caddy |
+| 2026-11-21 | Hyrum Kammerman | §4: Terraform also verifies the domain in SES, and the role can send email only from it |
 
 ---
 
@@ -139,7 +140,7 @@ flowchart LR
 
 ### Hosting
 
-One EC2 instance, in the same AWS account as Cognito, DynamoDB and SES, runs Caddy in front of the Node process. Caddy serves the built UI bundle, provides HTTPS on the app's domain with automatic certificates, and forwards `/api` requests to Node. The instance's IAM role grants access to the app's tables, to SES, and (from Milestone 3) to sending texts from the app's number, so no AWS keys live in the code. The instance holds no data, so it can be rebuilt from the repository. A Terraform config in `infra/` creates the instance, its role, its security group, its Elastic IP and the Route 53 record that points the domain at that IP, installs Caddy and its config (`infra/Caddyfile`) on the instance's first boot, and keeps its state in S3 so any maintainer can rebuild it; the [setup guide](setup.md#create-the-server) explains how. `infra/deploy.sh` ships a commit: it builds the UI and API on the maintainer's machine, uploads them to an S3 bucket, and has the instance install them through Systems Manager Run Command, where systemd runs the API, restarts it after a crash and starts it on boot. The API's production settings come from Terraform's variables, so they're never in the repository ([setup guide](setup.md#deploy-the-app)). Only ports 80 and 443 are open. A maintainer gets a shell through AWS Systems Manager Session Manager, so there is no SSH port or key to protect, and besides the app's table (and SES and texts, once notifications are built), the role has only the few permissions Session Manager and Run Command need, and read access to the release bucket.
+One EC2 instance, in the same AWS account as Cognito, DynamoDB and SES, runs Caddy in front of the Node process. Caddy serves the built UI bundle, provides HTTPS on the app's domain with automatic certificates, and forwards `/api` requests to Node. The instance's IAM role grants access to the app's tables, to SES, and (from Milestone 3) to sending texts from the app's number, so no AWS keys live in the code. The instance holds no data, so it can be rebuilt from the repository. A Terraform config in `infra/` creates the instance, its role, its security group, its Elastic IP, the Route 53 record that points the domain at that IP, and the domain's SES identity (verified with DKIM records, so the app's email is signed as coming from its domain), installs Caddy and its config (`infra/Caddyfile`) on the instance's first boot, and keeps its state in S3 so any maintainer can rebuild it; the [setup guide](setup.md#create-the-server) explains how. `infra/deploy.sh` ships a commit: it builds the UI and API on the maintainer's machine, uploads them to an S3 bucket, and has the instance install them through Systems Manager Run Command, where systemd runs the API, restarts it after a crash and starts it on boot. The API's production settings come from Terraform's variables, so they're never in the repository ([setup guide](setup.md#deploy-the-app)). Only ports 80 and 443 are open. A maintainer gets a shell through AWS Systems Manager Session Manager, so there is no SSH port or key to protect, and besides the app's table, sending email from the app's domain (and, from Milestone 3, texts), the role has only the few permissions Session Manager and Run Command need, and read access to the release bucket.
 
 ### Core flow, traced end to end
 
