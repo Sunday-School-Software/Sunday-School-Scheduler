@@ -1,19 +1,20 @@
 import { useRef, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
+import { authPageStateFrom } from "../../presenter/AuthPageState.ts";
 import { LoginPresenter, type LoginView } from "../../presenter/LoginPresenter.ts";
 import ErrorMessage from "../error/ErrorMessage.tsx";
 import { useErrorMessage } from "../error/ErrorMessageHooks.ts";
+import { inputClass, linkClass, primaryButtonClass } from "../form/formStyles.ts";
 import { useSessionActions } from "../session/SessionHooks.ts";
 
 interface Props {
   presenter?: LoginPresenter;
 }
 
-const inputClass =
-  "mt-1 w-full rounded-md border border-gray-400 bg-white px-3 py-2 text-base dark:bg-gray-900";
-
 export default function Login(props: Props) {
-  const [email, setEmail] = useState("");
+  // Set when the person comes here from verifying their email.
+  const arrival = authPageStateFrom(useLocation().state);
+  const [email, setEmail] = useState(arrival?.email ?? "");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { errorMessage, displayErrorMessage, clearErrorMessage } = useErrorMessage();
@@ -24,7 +25,7 @@ export default function Login(props: Props) {
   const listener: LoginView = {
     setIsLoading,
     setSession,
-    navigate: (url) => void navigate(url),
+    navigate: (url, state) => void navigate(url, { state }),
     displayErrorMessage,
   };
 
@@ -48,6 +49,11 @@ export default function Login(props: Props) {
     <main className="mx-auto w-full max-w-sm px-4 py-12">
       <p className="text-lg font-bold">Sunday School Scheduler</p>
       <h1 className="mt-6 text-2xl font-bold">Sign in</h1>
+      {arrival?.notice && (
+        <p role="status" className="mt-4">
+          {arrival.notice}
+        </p>
+      )}
       <form className="mt-4 space-y-4" onSubmit={submit}>
         <div>
           <label htmlFor="email" className="block font-medium">
@@ -82,14 +88,16 @@ export default function Login(props: Props) {
           />
         </div>
         <ErrorMessage id="login-error" message={errorMessage} />
-        <button
-          type="submit"
-          aria-disabled={isLoading}
-          className="w-full rounded-md bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 aria-disabled:opacity-60"
-        >
+        <button type="submit" aria-disabled={isLoading} className={primaryButtonClass}>
           {isLoading ? "Signing in…" : "Sign in"}
         </button>
       </form>
+      <p className="mt-6">
+        New here?{" "}
+        <Link to="/signup" className={linkClass}>
+          Create an account
+        </Link>
+      </p>
     </main>
   );
 }

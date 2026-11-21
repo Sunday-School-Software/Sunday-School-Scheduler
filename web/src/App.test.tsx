@@ -126,4 +126,70 @@ describe("App", () => {
     );
     expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
   });
+
+  it("walks a new person through signing up, verifying their email and signing in", async () => {
+    const fetchMock = mockFetch({
+      "/api/register": [201, {}],
+      "/api/register/verify": [200, {}],
+      "/api/login": [200, { accessToken: "token-123" }],
+      "/api/assignments": NO_ASSIGNMENTS,
+    });
+    const user = renderApp("/login");
+
+    await user.click(screen.getByRole("link", { name: "Create an account" }));
+    await user.type(screen.getByLabelText("Name"), "Teacher C");
+    await user.type(screen.getByLabelText("Email"), "teacher@example.com");
+    await user.type(screen.getByLabelText("Password"), "Secret-1");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(await screen.findByRole("heading", { name: "Verify your email" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("We emailed a code to teacher@example.com.");
+    await user.type(screen.getByLabelText("Code"), "123456");
+    await user.click(screen.getByRole("button", { name: "Verify email" }));
+
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Your email is verified.");
+    expect(screen.getByLabelText("Email")).toHaveValue("teacher@example.com");
+    await user.type(screen.getByLabelText("Password"), "Secret-1");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(
+      await screen.findByText("You have no assignments in the next 4 Sundays."),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/register/verify",
+      expect.objectContaining({ body: JSON.stringify({ email: "teacher@example.com", code: "123456" }) }),
+    );
+  });
+
+  it("says so, and stays on the sign-up page, when the email already has an account", async () => {
+    mockFetch({
+      "/api/register": [409, { error: "There's already an account with this email. Sign in instead.", problem: "exists" }],
+    });
+    const user = renderApp("/signup");
+
+    await user.type(screen.getByLabelText("Name"), "Teacher C");
+    await user.type(screen.getByLabelText("Email"), "teacher@example.com");
+    await user.type(screen.getByLabelText("Password"), "Secret-1");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "There's already an account with this email. Sign in instead.",
+    );
+    expect(screen.getByRole("heading", { name: "Create an account" })).toBeInTheDocument();
+  });
+
+  it("sends someone who signs in before verifying to enter their code", async () => {
+    mockFetch({
+      "/api/login": [403, { error: "Verify your email before you sign in.", problem: "not-verified" }],
+    });
+    const user = renderApp("/login");
+
+    await signIn(user, "Secret-1");
+
+    expect(await screen.findByRole("heading", { name: "Verify your email" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Verify your email before you sign in.");
+    expect(screen.getByLabelText("Email")).toHaveValue("teacher@example.com");
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+  });
 });

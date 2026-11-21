@@ -116,9 +116,8 @@ describe("Dashboard", () => {
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
-  it("shows the API's message when the account isn't on the schedule", async () => {
-    const message =
-      "Your account isn't on the Sunday School schedule yet. Ask a Sunday School leader to add you.";
+  it("shows the API's message for a client error", async () => {
+    const message = "Leaders can only see this.";
     mockFetch(403, { error: message });
 
     renderDashboard();

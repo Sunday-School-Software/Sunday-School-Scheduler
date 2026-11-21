@@ -1,5 +1,5 @@
 import { beforeEach, describe, it } from "@jest/globals";
-import { anything, instance, mock, spy, verify, when } from "@typestrong/ts-mockito";
+import { anything, deepEqual, instance, mock, spy, verify, when } from "@typestrong/ts-mockito";
 import { ApiError, GENERIC_ERROR_MESSAGE } from "../model/errors.ts";
 import { AuthService } from "../model/service/AuthService.ts";
 import { LoginPresenter, type LoginView } from "./LoginPresenter.ts";
@@ -40,6 +40,24 @@ describe("LoginPresenter", () => {
     verify(mockView.displayErrorMessage("Wrong email or password.")).once();
     verify(mockView.setSession(anything())).never();
     verify(mockView.navigate(anything())).never();
+    verify(mockView.setIsLoading(false)).once();
+  });
+
+  it("opens the verify page with the email for an account that isn't verified yet", async () => {
+    when(mockService.login(anything(), anything())).thenReject(
+      new ApiError("Verify your email before you sign in.", "not-verified"),
+    );
+
+    await presenter.doLogin(" teacher.c@example.com ", "Secret-1");
+
+    verify(
+      mockView.navigate(
+        "/verify",
+        deepEqual({ email: "teacher.c@example.com", notice: "Verify your email before you sign in." }),
+      ),
+    ).once();
+    verify(mockView.displayErrorMessage(anything())).never();
+    verify(mockView.setSession(anything())).never();
     verify(mockView.setIsLoading(false)).once();
   });
 

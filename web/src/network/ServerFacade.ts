@@ -11,6 +11,16 @@ function errorMessageFrom(body: unknown): string | undefined {
   return undefined;
 }
 
+// The `problem` field the API adds to account errors, such as "not-verified".
+function problemFrom(body: unknown): string | undefined {
+  if (typeof body === "object" && body !== null && "problem" in body) {
+    if (typeof body.problem === "string" && body.problem) {
+      return body.problem;
+    }
+  }
+  return undefined;
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value !== "";
 }
@@ -41,6 +51,18 @@ function isAssignment(value: unknown): value is Assignment {
 
 // The only place the UI calls the API.
 export class ServerFacade {
+  public async register(name: string, email: string, password: string): Promise<void> {
+    await this.request("POST", "/api/register", { body: { name, email, password } });
+  }
+
+  public async verifyEmail(email: string, code: string): Promise<void> {
+    await this.request("POST", "/api/register/verify", { body: { email, code } });
+  }
+
+  public async resendCode(email: string): Promise<void> {
+    await this.request("POST", "/api/register/resend", { body: { email } });
+  }
+
   public async login(email: string, password: string): Promise<string> {
     const body = await this.request("POST", "/api/login", { body: { email, password } });
     const accessToken = (body as { accessToken?: unknown } | undefined)?.accessToken;
@@ -116,10 +138,13 @@ export class ServerFacade {
       return responseBody;
     }
 
-    const message = response.status < 500 ? errorMessageFrom(responseBody) : undefined;
+    if (response.status >= 500) {
+      throw new ApiError();
+    }
+    const message = errorMessageFrom(responseBody);
     if (response.status === 401 && token) {
       throw new UnauthorizedError(message);
     }
-    throw new ApiError(message);
+    throw new ApiError(message, problemFrom(responseBody));
   }
 }

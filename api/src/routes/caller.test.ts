@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
+import {
+  CognitoIdentityProviderClient,
+  GetUserCommand,
+  NotAuthorizedException,
+} from "@aws-sdk/client-cognito-identity-provider";
 import {
   DynamoDBClient,
   InternalServerError,
+  PutItemCommand,
   QueryCommand,
   ResourceNotFoundException,
 } from "@aws-sdk/client-dynamodb";
@@ -124,15 +129,88 @@ describe("requireCaller", () => {
     expect(mockDb.calls()).toHaveLength(0);
   });
 
-  it("returns 403 for a valid token whose account isn't linked to a Person", async () => {
-    mockDb.on(QueryCommand).resolves({ Items: [] });
+  describe("for an account without a Person, such as one that just signed up", () => {
+    beforeEach(() => {
+      mockDb.on(QueryCommand).resolves({ Items: [] });
+      mockDb.on(PutItemCommand).resolves({});
+      mockCognito.on(GetUserCommand).resolves({
+        Username: USER_ID,
+        UserAttributes: [
+          { Name: "email", Value: "teacher.c@example.com" },
+          { Name: "email_verified", Value: "true" },
+          { Name: "name", Value: "Teacher C" },
+        ],
+      });
+    });
 
-    const res = await getCaller(TOKEN);
+    it("adds a teacher with the account's email and name, and gives it to the route", async () => {
+      const res = await getCaller(TOKEN);
 
-    expect(res.status).toBe(403);
-    expect(res.body).toEqual({
-      error:
-        "Your account isn't on the Sunday School schedule yet. Ask a Sunday School leader to add you.",
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        personId: USER_ID,
+        name: "Teacher C",
+        role: "teacher",
+        email: "teacher.c@example.com",
+        userId: USER_ID,
+      });
+      expect(mockCognito.commandCalls(GetUserCommand)[0]?.args[0].input).toEqual({ AccessToken: TOKEN });
+      expect(mockDb.commandCalls(PutItemCommand)).toHaveLength(1);
+    });
+
+    it("names the teacher by their email when the account has no name", async () => {
+      mockCognito.on(GetUserCommand).resolves({
+        Username: USER_ID,
+        UserAttributes: [
+          { Name: "email", Value: "teacher.c@example.com" },
+          { Name: "email_verified", Value: "true" },
+        ],
+      });
+
+      const res = await getCaller(TOKEN);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ name: "teacher.c@example.com" });
+    });
+
+    it("returns 403 without adding anyone when the account's email isn't verified", async () => {
+      // For example, someone changed their email in Cognito to another person's.
+      mockCognito.on(GetUserCommand).resolves({
+        Username: USER_ID,
+        UserAttributes: [
+          { Name: "email", Value: "someone.else@example.com" },
+          { Name: "email_verified", Value: "false" },
+        ],
+      });
+
+      const res = await getCaller(TOKEN);
+
+      expect(res.status).toBe(403);
+      expect(res.body).toEqual({ error: "Verify your email address before you continue." });
+      expect(mockDb.commandCalls(PutItemCommand)).toHaveLength(0);
+    });
+
+    it("returns 401 without adding anyone when Cognito rejects the token", async () => {
+      mockCognito
+        .on(GetUserCommand)
+        .rejects(new NotAuthorizedException({ message: "Access Token has been revoked", $metadata: {} }));
+
+      const res = await getCaller(TOKEN);
+
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual(notSignedIn);
+      expect(mockDb.commandCalls(PutItemCommand)).toHaveLength(0);
+    });
+
+    it("returns 503 when DynamoDB is down while adding the teacher", async () => {
+      mockDb
+        .on(PutItemCommand)
+        .rejects(new InternalServerError({ message: "DynamoDB is down.", $metadata: {} }));
+
+      const res = await getCaller(TOKEN);
+
+      expect(res.status).toBe(503);
+      expect(logged()).toEqual(["Identifying the caller failed: DynamoDB is down."]);
     });
   });
 

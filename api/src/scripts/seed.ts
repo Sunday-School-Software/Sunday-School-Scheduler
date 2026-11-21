@@ -4,7 +4,14 @@ import { cognitoConfigFrom, cognitoErrorMessage, createCognitoClient } from "../
 import { ensureUser } from "../auth/users.js";
 import { nextSundays } from "../dates.js";
 import { createDynamoClient, errorMessage, tableNameFrom } from "../db/client.js";
-import { SEED_SUNDAYS, SEED_TEACHERS, seedItems, seedPasswordFrom, writeItems } from "../db/seed.js";
+import {
+  removeSignUpPersons,
+  SEED_SUNDAYS,
+  SEED_TEACHERS,
+  seedItems,
+  seedPasswordFrom,
+  writeItems,
+} from "../db/seed.js";
 import { loadEnvFile } from "../env.js";
 
 loadEnvFile();
@@ -26,6 +33,7 @@ try {
   step = "dynamodb";
   const sundays = nextSundays(new Date(), SEED_SUNDAYS);
   const items = seedItems(SEED_TEACHERS, userIds, sundays, new Date());
+  await removeSignUpPersons(db, tableName, userIds.values());
   await writeItems(db, tableName, items);
 
   console.log(
