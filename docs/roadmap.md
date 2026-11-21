@@ -39,23 +39,30 @@ Deployment moved from Milestone 1 to Milestone 2, but it's still part of the MVP
 - **What it needs first:** [#40](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/40) and [#41](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/41) merged, and pilot users saying the generic message confused them. It's small and only touches the UI, so it could become a `good first issue`.
 - **How to help:** if the generic message confused you in the pilot, open an issue saying what you were doing when you saw it.
 
+### 4. Repeating classes (Planned)
+
+- **What a user loses:** a class belongs to one Sunday, so a leader creates Gospel Doctrine once for each Sunday instead of once for all of them.
+- **Why it was cut:** time. Creating a class four times is fine for the pilot. Cut from [#48](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/48).
+- **What it needs first:** creating a class from the schedule ([#106](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/106)).
+- **How to help:** open an issue to agree on the approach (for example, a "repeat for the next N Sundays" option that creates one Class per date), then build it once #106 is merged.
+
 ## Next
 
-### 4. Admin: accounts and roles in the app (Planned)
+### 5. Admin: accounts and roles in the app (Planned)
 
 - **What a user could do:** an admin creates accounts and sets each person's role (admin, leader or teacher) in the app.
 - **Why it isn't in the MVP:** the proposal made admin a P1 goal, after the MVP. Until then, people sign up and leader roles are added by hand ([design §2](design.md#2-goals-and-non-goals)). With one ward and a small presidency, that's workable for the pilot.
 - **What it needs first:** the MVP, especially people and account linking from [#49](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/49). The `admin` role is already in the data model ([design §5](design.md#5-data-model)).
 - **How to help:** open an issue that sketches the admin screen and the API rule for who can change a role.
 
-### 5. Broadcast: message all teachers at once (Planned)
+### 6. Broadcast: message all teachers at once (Planned)
 
 - **What a user could do:** a leader sends one message to every teacher instead of writing to each one.
 - **Why it isn't in the MVP:** like admin, it's a P1 goal from the proposal. [Design §8](design.md#8-implementation-plan) estimates admin and broadcast together at about 3–4 hours.
 - **What it needs first:** the Email Service from [#47](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/47) and SES production access from [#50](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/50). Teachers with no email ([#49](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/49)) won't get a broadcast, so leaders still need another way to reach them.
 - **How to help:** open an issue to decide what a broadcast looks like and what the leader sees if some emails fail.
 
-### 6. Notifications by text (Planned)
+### 7. Notifications by text (Planned)
 
 - **What a user could do:** choose to get assignment and response notifications by text instead of email.
 - **Why it isn't in the MVP:** carriers require a registered number first, and approval can take up to 15 business days, too late for the pilot. It's [Milestone 3](design.md#8-implementation-plan), due Dec 10, after the MVP ([design §6](design.md#decision-add-texts-through-aws-end-user-messaging-after-the-mvp)).
@@ -64,7 +71,7 @@ Deployment moved from Milestone 1 to Milestone 2, but it's still part of the MVP
 
 ## Later
 
-### 7. Lesson notes (Idea)
+### 8. Lesson notes (Idea)
 
 - **What a user could do:** attach a short note to one class on one Sunday. The data model has a Lesson note entity marked "Roadmap", with a class, an author and some content ([design §5](design.md#5-data-model)).
 - **What it isn't:** a place for teachers to share lesson plans or other content. That's a non-goal (see [Non-goals](#non-goals)). The design doesn't yet say who can read a note, so that's the first thing to decide.
@@ -72,7 +79,7 @@ Deployment moved from Milestone 1 to Milestone 2, but it's still part of the MVP
 - **What it needs first:** the MVP, and an agreed answer in an issue to who writes and reads notes.
 - **How to help:** if you're a teacher or leader and would use notes, open an issue saying what you'd write and who should see it.
 
-### 8. Move the API to Lambda (Idea)
+### 9. Move the API to Lambda (Idea)
 
 - **What a user could do:** nothing changes for users. There would be no server to patch or keep running.
 - **Why it isn't in the MVP:** the design puts the API on one EC2 instance, and the CP3 spike showed that working ([design §6](design.md#decision-put-a-node-backend-between-the-ui-and-aws)). Lambda only comes up if EC2 becomes a problem.
