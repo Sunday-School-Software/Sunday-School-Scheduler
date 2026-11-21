@@ -1,11 +1,24 @@
 import { beforeEach, describe, expect, it } from "@jest/globals";
 import {
+  CodeDeliveryFailureException,
+  CodeMismatchException,
   CognitoIdentityProviderClient,
+  ConfirmSignUpCommand,
+  ExpiredCodeException,
+  GetUserCommand,
   GlobalSignOutCommand,
   InitiateAuthCommand,
   InternalErrorException,
+  InvalidParameterException,
   InvalidPasswordException,
+  LimitExceededException,
   NotAuthorizedException,
+  ResendConfirmationCodeCommand,
+  SignUpCommand,
+  TooManyFailedAttemptsException,
+  TooManyRequestsException,
+  UsernameExistsException,
+  UserNotConfirmedException,
   UserNotFoundException,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { mockClient } from "aws-sdk-client-mock";
@@ -19,7 +32,13 @@ import {
   signToken,
   USER_ID,
 } from "../testing/tokens.js";
-import { createAuthService, InvalidCredentialsError, InvalidTokenError } from "./auth.js";
+import {
+  AccountError,
+  createAuthService,
+  InvalidCredentialsError,
+  InvalidTokenError,
+  type AccountProblem,
+} from "./auth.js";
 
 const mockCognito = mockClient(CognitoIdentityProviderClient);
 const client = new CognitoIdentityProviderClient({ region: "local" });
@@ -35,6 +54,148 @@ beforeEach(() => {
     AuthenticationResult: { AccessToken: "access-1", IdToken: "id-1", ExpiresIn: 3600 },
   });
   mockCognito.on(GlobalSignOutCommand).resolves({});
+  mockCognito.on(SignUpCommand).resolves({ UserSub: "sub-1", UserConfirmed: false });
+  mockCognito.on(ConfirmSignUpCommand).resolves({});
+  mockCognito.on(ResendConfirmationCodeCommand).resolves({});
+});
+
+const meta = { $metadata: {} };
+
+// Resolves to the AccountError's problem, or fails the test if it threw anything else.
+async function problemOf(promise: Promise<unknown>): Promise<AccountProblem> {
+  const err = await promise.then(
+    () => undefined,
+    (e: unknown) => e,
+  );
+  expect(err).toBeInstanceOf(AccountError);
+  return (err as AccountError).problem;
+}
+
+const tooMany = [
+  ["TooManyRequestsException", () => new TooManyRequestsException({ message: "Too many requests", ...meta })],
+  ["LimitExceededException", () => new LimitExceededException({ message: "Attempt limit exceeded", ...meta })],
+] as const;
+
+describe("register", () => {
+  const account = { name: "Teacher C", email: "teacher.c@example.com", password: "Secret-1" };
+
+  it("signs up with the email as the username, and the name as an attribute", async () => {
+    await auth.register(account);
+
+    const calls = mockCognito.commandCalls(SignUpCommand);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.args[0].input).toEqual({
+      ClientId: "client-1",
+      Username: "teacher.c@example.com",
+      Password: "Secret-1",
+      UserAttributes: [
+        { Name: "email", Value: "teacher.c@example.com" },
+        { Name: "name", Value: "Teacher C" },
+      ],
+    });
+  });
+
+  it.each([
+    ["exists", new UsernameExistsException({ message: "An account with the given email already exists.", ...meta })],
+    ["weak-password", new InvalidPasswordException({ message: "Password did not conform with policy", ...meta })],
+    ["invalid-input", new InvalidParameterException({ message: "Invalid email address format.", ...meta })],
+    ...tooMany.map(([, make]) => ["too-many-attempts", make()] as const),
+  ])("throws AccountError %s for %p", async (problem, err) => {
+    mockCognito.on(SignUpCommand).rejects(err);
+
+    await expect(problemOf(auth.register(account))).resolves.toBe(problem);
+  });
+
+  it("says plainly that the email is taken, without creating anything else", async () => {
+    mockCognito
+      .on(SignUpCommand)
+      .rejects(new UsernameExistsException({ message: "An account with the given email already exists.", ...meta }));
+
+    await expect(auth.register(account)).rejects.toThrow(
+      "There's already an account with this email. Sign in instead.",
+    );
+    expect(mockCognito.calls()).toHaveLength(1);
+  });
+
+  it("rethrows other Cognito errors with their message", async () => {
+    mockCognito
+      .on(SignUpCommand)
+      .rejects(new CodeDeliveryFailureException({ message: "Couldn't send the email.", ...meta }));
+
+    const err = await auth.register(account).catch((e: unknown) => e);
+    expect(err).not.toBeInstanceOf(AccountError);
+    expect(err).toHaveProperty("message", "Couldn't send the email.");
+  });
+});
+
+describe("verifyEmail", () => {
+  it("confirms the sign-up with the code", async () => {
+    await auth.verifyEmail("teacher.c@example.com", "123456");
+
+    const calls = mockCognito.commandCalls(ConfirmSignUpCommand);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.args[0].input).toEqual({
+      ClientId: "client-1",
+      Username: "teacher.c@example.com",
+      ConfirmationCode: "123456",
+    });
+  });
+
+  it.each([
+    ["wrong-code", new CodeMismatchException({ message: "Invalid verification code provided", ...meta })],
+    ["wrong-code", new UserNotFoundException({ message: "User does not exist.", ...meta })],
+    ["expired-code", new ExpiredCodeException({ message: "Invalid code provided, please request a code again.", ...meta })],
+    ["already-verified", new NotAuthorizedException({ message: "User cannot be confirmed. Current status is CONFIRMED", ...meta })],
+    ["too-many-attempts", new TooManyFailedAttemptsException({ message: "Too many failed attempts", ...meta })],
+    ...tooMany.map(([, make]) => ["too-many-attempts", make()] as const),
+  ])("throws AccountError %s for %p", async (problem, err) => {
+    mockCognito.on(ConfirmSignUpCommand).rejects(err);
+
+    await expect(problemOf(auth.verifyEmail("teacher.c@example.com", "000000"))).resolves.toBe(problem);
+  });
+
+  it("rethrows other Cognito errors with their message", async () => {
+    mockCognito
+      .on(ConfirmSignUpCommand)
+      .rejects(new InternalErrorException({ message: "Cognito is down.", ...meta }));
+
+    await expect(auth.verifyEmail("teacher.c@example.com", "123456")).rejects.toThrow("Cognito is down.");
+  });
+});
+
+describe("resendCode", () => {
+  it("asks Cognito to email a new code", async () => {
+    await auth.resendCode("teacher.c@example.com");
+
+    const calls = mockCognito.commandCalls(ResendConfirmationCodeCommand);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.args[0].input).toEqual({ ClientId: "client-1", Username: "teacher.c@example.com" });
+  });
+
+  it("succeeds for an unknown email, so it doesn't reveal who has an account", async () => {
+    mockCognito
+      .on(ResendConfirmationCodeCommand)
+      .rejects(new UserNotFoundException({ message: "User does not exist.", ...meta }));
+
+    await expect(auth.resendCode("nobody@example.com")).resolves.toBeUndefined();
+  });
+
+  it.each([
+    ["already-verified", new InvalidParameterException({ message: "User is already confirmed.", ...meta })],
+    ...tooMany.map(([, make]) => ["too-many-attempts", make()] as const),
+  ])("throws AccountError %s for %p", async (problem, err) => {
+    mockCognito.on(ResendConfirmationCodeCommand).rejects(err);
+
+    await expect(problemOf(auth.resendCode("teacher.c@example.com"))).resolves.toBe(problem);
+  });
+
+  it("rethrows other Cognito errors with their message", async () => {
+    mockCognito
+      .on(ResendConfirmationCodeCommand)
+      .rejects(new CodeDeliveryFailureException({ message: "Couldn't send the email.", ...meta }));
+
+    await expect(auth.resendCode("teacher.c@example.com")).rejects.toThrow("Couldn't send the email.");
+  });
 });
 
 describe("login", () => {
@@ -78,6 +239,14 @@ describe("login", () => {
     await expect(auth.login("teacher@example.com", "wrong")).rejects.toThrow(
       new InvalidCredentialsError(),
     );
+  });
+
+  it("throws AccountError not-verified for an account that hasn't verified its email", async () => {
+    mockCognito
+      .on(InitiateAuthCommand)
+      .rejects(new UserNotConfirmedException({ message: "User is not confirmed.", ...meta }));
+
+    await expect(problemOf(auth.login("teacher.c@example.com", "Secret-1"))).resolves.toBe("not-verified");
   });
 
   it("throws when Cognito asks for a challenge instead of signing in", async () => {
@@ -232,5 +401,77 @@ describe("verify", () => {
 
       await expect(auth.verify(signToken(key, localClaims(overrides)))).rejects.toThrow(InvalidTokenError);
     });
+  });
+});
+
+describe("profile", () => {
+  it("returns the signed-in user's email and name from Cognito", async () => {
+    mockCognito.on(GetUserCommand).resolves({
+      Username: "sub-1",
+      UserAttributes: [
+        { Name: "sub", Value: "sub-1" },
+        { Name: "email", Value: "Teacher.C@example.com" },
+        { Name: "email_verified", Value: "true" },
+        { Name: "name", Value: " Teacher C " },
+      ],
+    });
+
+    await expect(auth.profile("access-1")).resolves.toEqual({
+      email: "Teacher.C@example.com",
+      emailVerified: true,
+      name: "Teacher C",
+    });
+    expect(mockCognito.commandCalls(GetUserCommand)[0]?.args[0].input).toEqual({ AccessToken: "access-1" });
+  });
+
+  it("leaves out the name when the account has none", async () => {
+    mockCognito.on(GetUserCommand).resolves({
+      Username: "sub-1",
+      UserAttributes: [{ Name: "email", Value: "teacher.c@example.com" }],
+    });
+
+    await expect(auth.profile("access-1")).resolves.toEqual({
+      email: "teacher.c@example.com",
+      emailVerified: false,
+    });
+  });
+
+  it.each([
+    ["false", "false"],
+    ["missing", undefined],
+  ])("says the email isn't verified when email_verified is %s", async (_name, flag) => {
+    mockCognito.on(GetUserCommand).resolves({
+      Username: "sub-1",
+      UserAttributes: [
+        { Name: "email", Value: "someone.else@example.com" },
+        ...(flag ? [{ Name: "email_verified", Value: flag }] : []),
+      ],
+    });
+
+    await expect(auth.profile("access-1")).resolves.toMatchObject({ emailVerified: false });
+  });
+
+  it("counts cognito-local accounts as verified, since it never sets email_verified", async () => {
+    const local = createAuthService(client, { ...env, COGNITO_ENDPOINT: "http://localhost:9229" });
+    mockCognito.on(GetUserCommand).resolves({
+      Username: "sub-1",
+      UserAttributes: [{ Name: "email", Value: "teacher.c@example.com" }],
+    });
+
+    await expect(local.profile("access-1")).resolves.toMatchObject({ emailVerified: true });
+  });
+
+  it("throws when Cognito has no email for the user", async () => {
+    mockCognito.on(GetUserCommand).resolves({ Username: "sub-1", UserAttributes: [] });
+
+    await expect(auth.profile("access-1")).rejects.toThrow("Cognito returned no email");
+  });
+
+  it("throws InvalidTokenError when Cognito rejects the token", async () => {
+    mockCognito
+      .on(GetUserCommand)
+      .rejects(new NotAuthorizedException({ message: "Access Token has been revoked", ...meta }));
+
+    await expect(auth.profile("revoked")).rejects.toThrow(InvalidTokenError);
   });
 });

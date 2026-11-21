@@ -289,12 +289,14 @@ COGNITO_ENDPOINT=http://localhost:9229 COGNITO_USER_POOL_NAME=sunday-school-dev 
 
 With `COGNITO_ENDPOINT` set, you don't need AWS credentials or a region. If it says it couldn't connect, check that the container is running and the port matches.
 
-cognito-local doesn't send email. When someone signs up, it prints their verification code in the terminal where the container is running. It also differs from Cognito in AWS in ways that matter to the API:
+cognito-local doesn't send email. When someone signs up, it prints their verification code in the terminal where the container is running, and you type that code on the **Verify your email** page. It also differs from Cognito in AWS in ways that matter to the API:
 
 - Its tokens' issuer (`iss`) is `http://0.0.0.0:9229/<pool ID>` instead of `https://cognito-idp.<region>.amazonaws.com/<pool ID>`, and its signing keys are at `http://localhost:9229/<pool ID>/.well-known/jwks.json`. When `COGNITO_ENDPOINT` is set, the API expects that issuer, with the port from `COGNITO_ENDPOINT`, and gets the keys from there.
+- It never marks an email as verified, even after the code is entered, so the API trusts every cognito-local account's email.
 - Its access tokens last 24 hours instead of 1 hour.
 - Sign-in treats letter case in the email as significant, even though the pool is set to ignore it.
 - It can't sign anyone out. `POST /api/logout` answers 500, and the API logs `Unsupported x-amz-target header "GlobalSignOut"`. Use the pool in AWS to try signing out.
+- It can't send a new verification code. **Send a new code** answers `Couldn't send a new code`, and the API logs `Unsupported x-amz-target header "ResendConfirmationCode"`. The first code still works.
 
 ### In AWS
 
@@ -331,7 +333,7 @@ cp .env.example .env
 
 The IDs aren't secret, since the app client has no secret, but they belong to one environment, so keep them in `.env` rather than in the code.
 
-The API uses the same settings to check the access token on every request except `/api/health`, `/api/login` and `/api/logout`. It then looks up the signed-in user's Person in the table, so it also needs `DYNAMODB_TABLE` (and `DYNAMODB_ENDPOINT` for DynamoDB Local) for the same environment as the pool.
+The API uses the same settings to check the access token on every request except `/api/health`, `/api/login`, `/api/logout` and the sign-up routes under `/api/register`. It then looks up the signed-in user's Person in the table (adding a teacher for an account that signed up and has no Person yet), so it also needs `DYNAMODB_TABLE` (and `DYNAMODB_ENDPOINT` for DynamoDB Local) for the same environment as the pool.
 
 ## Load the seed data
 
@@ -556,7 +558,8 @@ The Elastic IP is protected, so `terraform destroy` stops with an error instead 
 - **`npm run seed` says the password did not conform with policy.** `SEED_PASSWORD` is too simple for the pool. Use at least 8 characters, with an uppercase letter, a lowercase letter, a number and a symbol. If your password already has all of those, check that it's in quotes in `api/.env`. Without them, everything from a `#` onward is read as a comment, so Cognito gets only the part before it.
 - **`POST /api/login` or `POST /api/logout` answers `Couldn't sign in` or `Couldn't sign out`.** Look at the terminal where the API is running. It prints `Login failed:` or `Logout failed:` and the reason, without the password or token. If it says to set `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID` or `AWS_REGION`, add them to `api/.env` (see [Where the IDs go](#where-the-ids-go)) and restart the API. Sign-out always fails against cognito-local (see [In cognito-local](#in-cognito-local)).
 - **A route answers `{"error":"You're not signed in."}` (401).** The request has no `Authorization: Bearer <accessToken>` header, or the token is expired (after 1 hour), changed, or from another pool or app client. Sign in again with `POST /api/login` and use the new token. With cognito-local, check that `COGNITO_ENDPOINT` uses the port cognito-local listens on, since the API expects that port in the token's issuer.
-- **A route answers `{"error":"Your account isn't on the Sunday School schedule yet. Ask a Sunday School leader to add you."}` (403).** The token is fine, but no Person in the table has that user's ID. Usually `DYNAMODB_TABLE` and `COGNITO_USER_POOL_ID` are for different environments, or the table was emptied after `npm run seed`. Run `npm run seed` again against the same table and pool.
+- **A seeded account signs in to an empty dashboard.** No Person in the table had that account's ID, so the API made a new teacher for it, as it does for someone who just signed up. Usually `DYNAMODB_TABLE` and `COGNITO_USER_POOL_ID` are for different environments, or the table was emptied (DynamoDB Local forgets everything when it stops) after `npm run seed`. Check the two settings, then run `npm run seed` again. It removes the teacher the API made and links the account to its seeded Person.
+- **A route answers `{"error":"Verify your email address before you continue."}` (403).** The account's email was changed in Cognito and the new address isn't verified yet, so the API won't make a Person with it.
 - **A route answers `{"error":"Something went wrong. Please try again."}` (500 or 503).** Look at the terminal where the API is running. It prints what failed, such as `Identifying the caller failed:`, `Listing assignments failed:` or `Updating an assignment failed:`, and the reason. A 503 means DynamoDB couldn't be reached, usually because DynamoDB Local isn't running. A 500 is anything else, such as cognito-local not running, the table not existing, or `DYNAMODB_TABLE` not set.
 - **`npm start` or `npm run preview` cannot find `dist/`.** Both run the compiled build. Run `npm run build` in the same project first.
 - **`terraform init` says the S3 bucket does not exist.** Make the [state bucket](#make-the-state-bucket-once-per-aws-account) first, and check that `BUCKET` and `AWS_REGION` in your shell match it. They're shell variables, so a new terminal needs them set again.

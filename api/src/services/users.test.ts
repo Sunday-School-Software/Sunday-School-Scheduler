@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it } from "@jest/globals";
 import {
+  ConditionalCheckFailedException,
   DynamoDBClient,
+  GetItemCommand,
   InternalServerError,
+  PutItemCommand,
   QueryCommand,
   ResourceNotFoundException,
   type AttributeValue,
@@ -119,5 +122,92 @@ describe("findByUserId", () => {
       "Set DYNAMODB_TABLE",
     );
     expect(mockDb.commandCalls(QueryCommand)).toHaveLength(0);
+  });
+});
+
+describe("linkAccount", () => {
+  const NEW_USER_ID = "2b1d4e6f-0a3c-4b5d-8e7f-9a0b1c2d3e4f";
+  const account = { email: "Teacher.C@Example.com", name: "Teacher C" };
+  const newPerson = {
+    personId: NEW_USER_ID,
+    name: "Teacher C",
+    role: "teacher",
+    email: "teacher.c@example.com",
+    userId: NEW_USER_ID,
+  };
+
+  beforeEach(() => {
+    mockDb.on(PutItemCommand).resolves({});
+  });
+
+  it("adds a new teacher whose ID is the user ID, keyed as in docs/data-model.md", async () => {
+    await expect(users.linkAccount(NEW_USER_ID, account)).resolves.toEqual(newPerson);
+
+    const calls = mockDb.commandCalls(PutItemCommand);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.args[0].input).toEqual({
+      TableName: "test-table",
+      Item: {
+        pk: { S: `PERSON#${NEW_USER_ID}` },
+        sk: { S: "PERSON" },
+        gsi1pk: { S: "PEOPLE" },
+        gsi1sk: { S: `teacher#Teacher C#${NEW_USER_ID}` },
+        person_id: { S: NEW_USER_ID },
+        name: { S: "Teacher C" },
+        role: { S: "teacher" },
+        email: { S: "teacher.c@example.com" },
+        user_id: { S: NEW_USER_ID },
+      },
+      ConditionExpression: "attribute_not_exists(pk)",
+    });
+  });
+
+  it("returns the Person another request just made, read consistently, instead of a second one", async () => {
+    const existing = { ...newPerson, name: "Teacher C (first)" };
+    mockDb
+      .on(PutItemCommand)
+      .rejects(new ConditionalCheckFailedException({ message: "The conditional request failed", $metadata: {} }));
+    mockDb.on(GetItemCommand).resolves({
+      Item: {
+        pk: { S: `PERSON#${NEW_USER_ID}` },
+        sk: { S: "PERSON" },
+        person_id: { S: NEW_USER_ID },
+        name: { S: existing.name },
+        role: { S: "teacher" },
+        email: { S: existing.email },
+        user_id: { S: NEW_USER_ID },
+      },
+    });
+
+    await expect(users.linkAccount(NEW_USER_ID, account)).resolves.toEqual(existing);
+    expect(mockDb.commandCalls(GetItemCommand)[0]?.args[0].input).toEqual({
+      TableName: "test-table",
+      Key: { pk: { S: `PERSON#${NEW_USER_ID}` }, sk: { S: "PERSON" } },
+      ConsistentRead: true,
+    });
+  });
+
+  it.each([
+    ["is missing", {}],
+    ["belongs to another account", { Item: { ...personItem(), user_id: { S: "someone-else" } } }],
+  ])("throws when the Person in the way %s", async (_name, getResult) => {
+    mockDb
+      .on(PutItemCommand)
+      .rejects(new ConditionalCheckFailedException({ message: "The conditional request failed", $metadata: {} }));
+    mockDb.on(GetItemCommand).resolves(getResult);
+
+    await expect(users.linkAccount(NEW_USER_ID, account)).rejects.toThrow(
+      `PERSON#${NEW_USER_ID} exists but isn't linked to user_id ${NEW_USER_ID}.`,
+    );
+  });
+
+  it("throws DatabaseUnavailableError when DynamoDB fails", async () => {
+    mockDb
+      .on(PutItemCommand)
+      .rejects(new InternalServerError({ message: "DynamoDB is down.", $metadata: {} }));
+
+    const err = await users.linkAccount(NEW_USER_ID, account).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DatabaseUnavailableError);
+    expect(mockDb.commandCalls(GetItemCommand)).toHaveLength(0);
   });
 });

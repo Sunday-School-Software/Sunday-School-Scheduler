@@ -92,9 +92,9 @@ The UI runs in the browser. Everything else is one Node (TypeScript) process on 
 | Component | Responsibility | Talks to | Interface (rough) |
 |---|---|---|---|
 | UI | Sign-in, teacher dashboard, leader schedule, teacher actions, and messages. | API | HTTPS JSON with the JWT, e.g. `POST /login`, `GET /assignments`, `PUT /assignments/{class}` |
-| API | Verifies caller, checks their role, calls services, and sends notifications by each person's chosen channel. | UI and the services | HTTP routes returning JSON and status codes (200, 400, 401, 403, 500, 503) |
-| Auth Service | Signs users up and in through Cognito and verifies JWTs | Cognito | `register()`, `login()`, `logout()` → JWT; `verify(jwt)` → user_id |
-| User Service | Creates people, links and finds accounts and roles, and stores how each person wants to be notified | DB | `create(name, email?)`, `linkAccount(user_id, email)`, `findByUserId(user_id)` → Person, `listLeaders()` → leaders' contact details; Milestone 3: `setNotifyBy(person, channel, phone?)` |
+| API | Verifies caller, checks their role, calls services, and sends notifications by each person's chosen channel. | UI and the services | HTTP routes returning JSON and status codes (200, 201, 400, 401, 403, 409, 429, 500, 503) |
+| Auth Service | Signs users up and in through Cognito and verifies JWTs | Cognito | `register()`, `verifyEmail()`, `resendCode()`, `login()`, `logout()` → JWT; `verify(jwt)` → user_id; `profile(jwt)` → email and name |
+| User Service | Creates people, links and finds accounts and roles, and stores how each person wants to be notified | DB | `create(name, email?)`, `linkAccount(user_id, email, name)`, `findByUserId(user_id)` → Person, `listLeaders()` → leaders' contact details; Milestone 3: `setNotifyBy(person, channel, phone?)` |
 | Class Service | Classes, assignments and responses | DB | `createClass()`, `assign(class, person)`, `reassign(class, from, to)`, `listAssignments(person_id, dates)`, `listSchedule(dates)`, `update(class, person, status)` |
 | Email Service | Sends notification emails. | SES | `email(addresses, message)` → OK/error |
 | SMS Service (Milestone 3) | Sends notification texts from the app's toll-free number. | End User Messaging | `text(phoneNumbers, message)` → OK/error |

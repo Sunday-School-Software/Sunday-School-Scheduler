@@ -85,6 +85,76 @@ describe("ServerFacade", () => {
     });
   });
 
+  describe("register", () => {
+    it("posts the name, email and password", async () => {
+      const fetchMock = mockFetch(201, {});
+
+      await facade.register("Teacher C", "teacher.c@example.com", "Secret-1");
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Teacher C", email: "teacher.c@example.com", password: "Secret-1" }),
+      });
+    });
+
+    it("throws the API's message and problem for an email that's taken", async () => {
+      mockFetch(409, { error: "There's already an account with this email. Sign in instead.", problem: "exists" });
+
+      const error = await facade.register("Teacher C", "teacher.c@example.com", "Secret-1").catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({
+        message: "There's already an account with this email. Sign in instead.",
+        problem: "exists",
+      });
+    });
+
+    it("leaves out the problem for a server error", async () => {
+      mockFetch(500, { error: "Couldn't create your account.", problem: "exists" });
+
+      const error = await facade.register("Teacher C", "teacher.c@example.com", "Secret-1").catch((e: unknown) => e);
+
+      expect(error).toMatchObject({ message: GENERIC_ERROR_MESSAGE, problem: undefined });
+    });
+  });
+
+  describe("verifyEmail", () => {
+    it("posts the email and code", async () => {
+      const fetchMock = mockFetch(200, {});
+
+      await facade.verifyEmail("teacher.c@example.com", "123456");
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/register/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "teacher.c@example.com", code: "123456" }),
+      });
+    });
+
+    it("throws the API's message for a wrong code", async () => {
+      mockFetch(400, { error: "That code isn't right.", problem: "wrong-code" });
+
+      await expect(facade.verifyEmail("teacher.c@example.com", "000000")).rejects.toThrow(
+        "That code isn't right.",
+      );
+    });
+  });
+
+  describe("resendCode", () => {
+    it("posts the email", async () => {
+      const fetchMock = mockFetch(200, {});
+
+      await facade.resendCode("teacher.c@example.com");
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/register/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "teacher.c@example.com" }),
+      });
+    });
+  });
+
   describe("logout", () => {
     it("sends the token as a Bearer token", async () => {
       const fetchMock = mockFetch(200, {});
@@ -178,9 +248,8 @@ describe("ServerFacade", () => {
       await expect(facade.listAssignments("token-123")).rejects.toThrow(UnauthorizedError);
     });
 
-    it("throws the API's message when the account isn't on the schedule", async () => {
-      const message =
-        "Your account isn't on the Sunday School schedule yet. Ask a Sunday School leader to add you.";
+    it("throws the API's message for a 4xx response", async () => {
+      const message = "A message from the API.";
       mockFetch(403, { error: message });
 
       const error = await facade.listAssignments("token-123").catch((e: unknown) => e);

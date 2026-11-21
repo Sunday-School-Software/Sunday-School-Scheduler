@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it } from "@jest/globals";
-import { DynamoDBClient, PutItemCommand, ResourceNotFoundException } from "@aws-sdk/client-dynamodb";
+import {
+  DeleteItemCommand,
+  DynamoDBClient,
+  PutItemCommand,
+  ResourceNotFoundException,
+} from "@aws-sdk/client-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
 import {
+  removeSignUpPersons,
   SEED_SUNDAYS,
   SEED_TEACHERS,
   seedItems,
@@ -26,6 +32,7 @@ const find = (items: Item[], pk: string, sk: string) =>
 beforeEach(() => {
   mockDb.reset();
   mockDb.on(PutItemCommand).resolves({});
+  mockDb.on(DeleteItemCommand).resolves({});
 });
 
 describe("seedPasswordFrom", () => {
@@ -190,5 +197,26 @@ describe("writeItems", () => {
     mockDb.on(PutItemCommand).rejects(new Error("AccessDeniedException"));
 
     await expect(writeItems(client, "test-table", items)).rejects.toThrow("AccessDeniedException");
+  });
+});
+
+describe("removeSignUpPersons", () => {
+  it("deletes the Person the API would have made for each seeded account", async () => {
+    await removeSignUpPersons(client, "test-table", userIds.values());
+
+    expect(mockDb.commandCalls(DeleteItemCommand).map((call) => call.args[0].input)).toEqual([
+      { TableName: "test-table", Key: { pk: { S: "PERSON#sub-0" }, sk: { S: "PERSON" } } },
+      { TableName: "test-table", Key: { pk: { S: "PERSON#sub-1" }, sk: { S: "PERSON" } } },
+    ]);
+  });
+
+  it("says to create the table when it doesn't exist", async () => {
+    mockDb
+      .on(DeleteItemCommand)
+      .rejects(new ResourceNotFoundException({ message: "Requested resource not found", $metadata: {} }));
+
+    await expect(removeSignUpPersons(client, "test-table", ["sub-0"])).rejects.toThrow(
+      "Table test-table doesn't exist. Run `npm run db:create` first.",
+    );
   });
 });

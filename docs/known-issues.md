@@ -8,10 +8,10 @@ These are temporary on purpose. Don't build on them as if they were the real thi
 
 ### Data and accounts come from a seed script
 
-- **What happens:** there's no way to create classes, assign teachers or sign up in the app. The seed script creates two made-up teachers (with `example.com` addresses), their Cognito accounts, classes on the next 4 Sundays and pending assignments.
-- **When it bites:** whenever you want different data, or a new account.
+- **What happens:** there's no way to create classes or assign teachers in the app. People can sign up, but a new account starts as a teacher with no assignments. The seed script creates two made-up teachers (with `example.com` addresses), their Cognito accounts, classes on the next 4 Sundays and pending assignments.
+- **When it bites:** whenever you want different classes or assignments.
 - **Workaround:** edit `api/src/db/seed.ts` and run `npm run seed` again (see the [setup guide](setup.md#load-the-seed-data)). Running it again doesn't create duplicates, and it resets every seeded assignment to pending.
-- **Tracked in:** [#34] (the seed script). Leaders building the schedule is [#48], and sign-up is [#69] (both Milestone 2).
+- **Tracked in:** [#34] (the seed script). Leaders building the schedule is [#48] (Milestone 2).
 
 ### Nobody is notified when a teacher responds
 
@@ -79,7 +79,6 @@ These are temporary on purpose. Don't build on them as if they were the real thi
 [#41]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/41
 [#47]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/47
 [#48]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/48
-[#69]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/69
 [#77]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/77
 [#79]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/79
 [#85]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/85

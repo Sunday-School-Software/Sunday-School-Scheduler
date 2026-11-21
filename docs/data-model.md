@@ -29,7 +29,7 @@ The costs: the keys are more abstract than three named tables, which is why this
 
 ## Items and keys
 
-Every item has a partition key `pk` and a sort key `sk`, both strings. The prefix (`PERSON#`, `CLASS#`, `ASSIGN#`) says what kind of item it is. IDs are UUIDs from `crypto.randomUUID()`. Dates are `YYYY-MM-DD` strings, so they sort in date order.
+Every item has a partition key `pk` and a sort key `sk`, both strings. The prefix (`PERSON#`, `CLASS#`, `ASSIGN#`) says what kind of item it is. IDs are UUIDs from `crypto.randomUUID()`, except that a Person made by sign-up uses its account's `user_id` (also a UUID) as its `person_id`, so the same account can't make two Persons. Dates are `YYYY-MM-DD` strings, so they sort in date order.
 
 | Item | `pk` | `sk` | Other attributes |
 |---|---|---|---|
@@ -77,13 +77,13 @@ Every read and write the app makes in Milestones 1 to 3. None of them scans the 
 | 1 | The Person for the signed-in user, on every request | User `findByUserId(user_id)` | 1 ([#36]) | Query `ByUser`: `user_id = :sub` |
 | 2 | A teacher's assignments for the next 4 Sundays | Class `listAssignments(person_id, dates)` | 1 ([#37]) | Query `GSI1`: `gsi1pk = PERSON#<person_id>` and `gsi1sk BETWEEN :from AND :to` (see [Date windows](#date-windows)) |
 | 3 | A teacher confirms or requests a substitute | Class `update(class, person, status)` | 1 ([#38]) | UpdateItem on the assignment's key, with a condition (see [The conditional write](#the-conditional-write)) |
-| 4 | Seed teachers, classes and assignments | seed script | 1 ([#34]) | PutItem. A Put replaces the whole item, so running the script again resets every seeded assignment to `pending`. The script uses hard-coded keys rather than UUIDs to make this reset possible. |
+| 4 | Seed teachers, classes and assignments | seed script | 1 ([#34]) | PutItem. A Put replaces the whole item, so running the script again resets every seeded assignment to `pending`. The script uses hard-coded keys rather than UUIDs to make this reset possible. First it deletes `PERSON#<user_id>` for each seeded account, in case the API gave that account a new Person while its seeded one was missing (pattern 10). |
 | 5 | Every class and assignment for the next 4 Sundays | Class `listSchedule(dates)` | 2 ([#48]) | Query `GSI2`: `gsi2pk = SCHEDULE` and `gsi2sk BETWEEN :from AND :to`. Class Service works out covered, tentative and uncovered from the results |
 | 6 | One class with everyone assigned to it | Class Service | 2 ([#48]) | Query: `pk = CLASS#<class_id>` |
 | 7 | Everyone, to pick a teacher to assign | User Service | 2 ([#48]) | Query `GSI1`: `gsi1pk = PEOPLE` |
 | 8 | The leaders' contact details (email, and from Milestone 3 phone and `notify_by`) | User `listLeaders()` | 2 ([#47]) | Query `GSI1`: `gsi1pk = PEOPLE` and `begins_with(gsi1sk, "leader#")` |
 | 9 | Add a person | User `create(name, email?)` | 2 ([#48], [#49]) | Query `ByEmail` first if there's an email, then PutItem with `attribute_not_exists(pk)` |
-| 10 | Link a new account to an existing Person | User `linkAccount(user_id, email)` | 2 ([#49]) | Query `ByEmail`. If a Person is found, UpdateItem `SET user_id` with `attribute_not_exists(user_id)`; if not, PutItem a new teacher |
+| 10 | Give a new account its Person, on its first request | User `linkAccount(user_id, email, name)` | 2 ([#69], [#49]) | From [#49], Query `ByEmail` first, and if a Person is found, UpdateItem `SET user_id` with `attribute_not_exists(user_id)`. Otherwise ([#69]) PutItem a new teacher whose `person_id` is the `user_id`, with `attribute_not_exists(pk)`. If that fails, another request just made it, so GetItem it with `ConsistentRead` |
 | 11 | Add a class | Class `createClass()` | 2 ([#48]) | PutItem with `attribute_not_exists(pk)` |
 | 12 | Assign a teacher to a class | Class `assign(class, person)` | 2 ([#48]) | GetItem the class and the Person for the copied fields, then TransactWriteItems: ConditionCheck that both still exist, and Put the assignment with `attribute_not_exists(pk)` |
 | 13 | Replace one teacher with another | Class `reassign(class, from, to)` | 2 ([#48]) | TransactWriteItems: Delete the old assignment with `attribute_exists(pk)` and Put the new one with `attribute_not_exists(pk)` |
@@ -148,3 +148,4 @@ The table uses **on-demand capacity** (`PAY_PER_REQUEST`), so there's no capacit
 [#47]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/47
 [#48]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/48
 [#49]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/49
+[#69]: https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues/69

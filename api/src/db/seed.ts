@@ -1,4 +1,5 @@
 import {
+  DeleteItemCommand,
   PutItemCommand,
   ResourceNotFoundException,
   type AttributeValue,
@@ -137,6 +138,34 @@ export function seedItems(
     });
   }
   return items;
+}
+
+// If a seeded account made a request while its Person was missing, such as
+// after DynamoDB Local restarted, the API gave it a new Person keyed by its
+// user ID, as it does for sign-ups. Removing that Person before writing the
+// seeded one keeps the account linked to exactly one Person.
+export async function removeSignUpPersons(
+  client: DynamoDBClient,
+  tableName: string,
+  userIds: Iterable<string>,
+): Promise<void> {
+  for (const userId of userIds) {
+    try {
+      await client.send(
+        new DeleteItemCommand({
+          TableName: tableName,
+          Key: { pk: { S: `PERSON#${userId}` }, sk: { S: "PERSON" } },
+        }),
+      );
+    } catch (err) {
+      if (err instanceof ResourceNotFoundException) {
+        throw new Error(`Table ${tableName} doesn't exist. Run \`npm run db:create\` first.`, {
+          cause: err,
+        });
+      }
+      throw err;
+    }
+  }
 }
 
 // PutItem replaces the whole item, so this resets every seeded assignment to

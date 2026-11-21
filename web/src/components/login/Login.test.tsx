@@ -6,10 +6,10 @@ import { MemoryRouter } from "react-router";
 import { LoginPresenter } from "../../presenter/LoginPresenter.ts";
 import Login from "./Login.tsx";
 
-function renderLogin() {
+function renderLogin(state?: unknown) {
   const mockPresenter = mock<LoginPresenter>();
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[{ pathname: "/login", state }]}>
       <Login presenter={instance(mockPresenter)} />
     </MemoryRouter>,
   );
@@ -55,5 +55,27 @@ describe("Login", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     verify(mockPresenter.doLogin(anything(), anything())).never();
+  });
+});
+
+describe("Login, for people without an account", () => {
+  it("links to the sign-up page", () => {
+    renderLogin();
+
+    expect(screen.getByRole("link", { name: "Create an account" })).toHaveAttribute("href", "/signup");
+  });
+
+  it("fills in the email and shows the notice it was opened with", () => {
+    renderLogin({ email: "teacher.c@example.com", notice: "Your email is verified." });
+
+    expect(screen.getByLabelText("Email")).toHaveValue("teacher.c@example.com");
+    expect(screen.getByRole("status")).toHaveTextContent("Your email is verified.");
+  });
+
+  it("shows no notice when opened directly", () => {
+    renderLogin();
+
+    expect(screen.getByLabelText("Email")).toHaveValue("");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

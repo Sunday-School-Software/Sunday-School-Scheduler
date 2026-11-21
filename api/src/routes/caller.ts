@@ -13,9 +13,10 @@ declare module "express-serve-static-core" {
 
 // Identifies the caller of every route mounted after it (design §4, step 2):
 // verify(jwt) gives the user_id, and findByUserId(user_id) the Person and role.
-// A missing or bad token gets 401. A good token for an account that isn't
-// linked to a Person gets 403. DynamoDB being unreachable gets 503, and any
-// other failure 500.
+// An account without a Person yet, such as one that just signed up, gets one
+// from linkAccount(), using its email and name from Cognito, once that email is
+// verified (403 until then). A missing or bad token gets 401. DynamoDB being
+// unreachable gets 503, and any other failure 500.
 export function requireCaller(
   authService: AuthService,
   userService: UserService,
@@ -29,7 +30,16 @@ export function requireCaller(
 
     let person;
     try {
-      person = await userService.findByUserId(await authService.verify(token));
+      const userId = await authService.verify(token);
+      person = await userService.findByUserId(userId);
+      if (!person) {
+        const { email, emailVerified, name } = await authService.profile(token);
+        if (!emailVerified) {
+          res.status(403).json({ error: "Verify your email address before you continue." });
+          return;
+        }
+        person = await userService.linkAccount(userId, { email, name: name ?? email });
+      }
     } catch (err) {
       if (err instanceof InvalidTokenError) {
         res.status(401).json({ error: "You're not signed in." });
@@ -39,14 +49,6 @@ export function requireCaller(
       res
         .status(err instanceof DatabaseUnavailableError ? 503 : 500)
         .json({ error: "Something went wrong. Please try again." });
-      return;
-    }
-
-    if (!person) {
-      res.status(403).json({
-        error:
-          "Your account isn't on the Sunday School schedule yet. Ask a Sunday School leader to add you.",
-      });
       return;
     }
 
