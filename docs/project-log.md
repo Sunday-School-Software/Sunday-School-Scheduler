@@ -41,5 +41,5 @@ Hours logged as I work, starting 11/18/2026.
 | 11/20/2026 | Set up Caddy to serve the app over HTTPS and pointed the domain at the server with a Route 53 record; tested it locally, then put it on the live server at sunday-school.echowebprogramming.click and checked HTTPS, the redirect and page refreshes | 1 |
 | 11/20/2026 | Built sign-up (#69): the sign-up and verify-email pages, the API routes and Cognito calls behind them, and a new teacher Person for each new account; tested it end to end against cognito-local and DynamoDB Local, then reviewed the pull request in chunks and ran it locally | 1.5 |
 | 11/20/2026 | Requested SES production access so the pilot can email real teachers, and confirmed AWS granted it | 0.25 |
-| 11/21/2026 | Set up SES in Terraform so the app can send email from its domain: verified the domain with DKIM records in Route 53, let the server's role send only from it, and wrote the setup steps, including leaving the SES sandbox | 0.5 |
-| **Total** | | **5.75** |
+| 11/21/2026 | Set up SES in Terraform so the app can send email from its domain: verified the domain with DKIM records in Route 53, let the server's role send only from it, and wrote the setup steps, including leaving the SES sandbox; then reviewed the pull request piece by piece | 1 |
+| **Total** | | **6.25** |
