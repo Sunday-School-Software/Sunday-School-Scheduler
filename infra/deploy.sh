@@ -1,6 +1,6 @@
 #!/bin/bash
-# Builds a commit of the app and installs it on the server. From anywhere in
-# the repo:
+# Builds a commit of the app and installs it on the server. From the repo's
+# root folder:
 #   infra/deploy.sh          # ships origin/main
 #   infra/deploy.sh <ref>    # ships another branch, tag or commit
 # docs/setup.md ("Deploy the app") explains what it needs and what it does.

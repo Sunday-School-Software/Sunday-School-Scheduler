@@ -594,7 +594,7 @@ One command builds the UI and the API from `main` and installs them on the serve
 infra/deploy.sh
 ```
 
-Run it from anywhere in the repository. It takes a few minutes, most of it building.
+Run it from the repository's root folder. If you're still in `infra/` from [Create the server](#create-the-server), run `cd ..` first. It takes a few minutes, most of it building.
 
 ### What you need
 
