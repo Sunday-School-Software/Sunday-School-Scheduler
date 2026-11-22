@@ -13,6 +13,10 @@ Type=simple
 # a new one.
 WorkingDirectory=/srv/sunday-school/api
 EnvironmentFile=/etc/sunday-school/api.env
+# The AWS SDK looks for ~/.aws/config at startup and crashes if the user has no
+# home folder, which DynamicUser's user doesn't. A folder that doesn't exist
+# has no config files, so the SDK uses the instance's role.
+Environment=HOME=/nonexistent
 ExecStart=/usr/bin/node dist/index.js
 
 # Start again after a crash, as often as it takes. 5 seconds apart keeps it
