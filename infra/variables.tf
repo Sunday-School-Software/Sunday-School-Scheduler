@@ -1,3 +1,30 @@
+variable "cognito_client_id" {
+  description = "The production user pool's app client ID. `npm run cognito:create` prints it as COGNITO_CLIENT_ID."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9]+$", var.cognito_client_id))
+    error_message = "Set cognito_client_id to the COGNITO_CLIENT_ID that `npm run cognito:create` printed for the production pool."
+  }
+}
+
+variable "cognito_user_pool_id" {
+  description = "The production user pool's ID, such as us-east-1_AbCdEf123. `npm run cognito:create` prints it as COGNITO_USER_POOL_ID."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9-]+_[A-Za-z0-9]+$", var.cognito_user_pool_id))
+    error_message = "Set cognito_user_pool_id to the COGNITO_USER_POOL_ID that `npm run cognito:create` printed for the production pool, such as us-east-1_AbCdEf123."
+  }
+
+  # The API calls Cognito in the server's region (AWS_REGION), so a pool in
+  # another region would fail every sign-in.
+  validation {
+    condition     = startswith(var.cognito_user_pool_id, "${var.region}_")
+    error_message = "The user pool must be in region: its ID starts with the region, such as us-east-1_."
+  }
+}
+
 variable "domain" {
   description = "The app's domain, such as scheduler.example.org. Caddy gets an HTTPS certificate for it, and a DNS record in hosted_zone points it at the server."
   type        = string

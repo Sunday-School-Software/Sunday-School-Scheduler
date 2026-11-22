@@ -64,6 +64,47 @@ resource "aws_iam_role_policy" "session_manager" {
   })
 }
 
+# deploy.sh installs a release with Run Command, which reaches the instance's
+# agent through these message actions. Like Session Manager's, they can't be
+# limited to one resource, and they only fetch and answer commands sent to
+# this instance.
+resource "aws_iam_role_policy" "run_command" {
+  name = "run-command"
+  role = aws_iam_role.server.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "ec2messages:AcknowledgeMessage",
+        "ec2messages:DeleteMessage",
+        "ec2messages:FailMessage",
+        "ec2messages:GetEndpoint",
+        "ec2messages:GetMessages",
+        "ec2messages:SendReply",
+      ]
+      Resource = "*"
+    }]
+  })
+}
+
+# Downloads a release that deploy.sh uploaded. Read only, and only releases:
+# the server can't change what it runs.
+resource "aws_iam_role_policy" "releases" {
+  name = "releases"
+  role = aws_iam_role.server.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "s3:GetObject"
+      Resource = "arn:aws:s3:::${local.release_bucket}/releases/*"
+    }]
+  })
+}
+
 # Sends email (simple, raw or templated, through the SES v2 API) from the
 # app's domain only (email.tf), and nothing else in SES: no other sender, no
 # account or identity changes.
@@ -93,6 +134,8 @@ resource "aws_iam_role_policies_exclusive" "server" {
   policy_names = [
     aws_iam_role_policy.table.name,
     aws_iam_role_policy.session_manager.name,
+    aws_iam_role_policy.run_command.name,
+    aws_iam_role_policy.releases.name,
     aws_iam_role_policy.email.name,
   ]
 }

@@ -1,6 +1,7 @@
 # Checks the server's network rules and its role's permissions (what issue
 # #42's acceptance criteria limit), the switch that stops it, the domain's DNS
-# record and Caddy setup (#43), and its SES identity (#99). Runs against a fake AWS provider: no
+# record and Caddy setup (#43), its SES identity (#99), and the release bucket
+# and API settings that deploy.sh uses (#44). Runs against a fake AWS provider: no
 # credentials, and nothing is created. Run from infra/:
 #   terraform init -backend=false
 #   terraform test
@@ -37,11 +38,13 @@ override_resource {
 }
 
 variables {
-  domain      = "scheduler.example.org"
-  hosted_zone = "example.org"
-  region      = "us-east-1"
-  running     = true
-  table_name  = "sunday-school-test"
+  cognito_client_id    = "1example23456789abcdefghij"
+  cognito_user_pool_id = "us-east-1_AbCdEf123"
+  domain               = "scheduler.example.org"
+  hosted_zone          = "example.org"
+  region               = "us-east-1"
+  running              = true
+  table_name           = "sunday-school-test"
 }
 
 run "dns" {
@@ -227,6 +230,31 @@ run "role" {
   }
 
   assert {
+    condition = toset(jsondecode(aws_iam_role_policy.run_command.policy).Statement[0].Action) == toset([
+      "ec2messages:AcknowledgeMessage",
+      "ec2messages:DeleteMessage",
+      "ec2messages:FailMessage",
+      "ec2messages:GetEndpoint",
+      "ec2messages:GetMessages",
+      "ec2messages:SendReply",
+    ])
+    error_message = "The Run Command policy should allow only the six message actions."
+  }
+  assert {
+    condition     = length(jsondecode(aws_iam_role_policy.run_command.policy).Statement) == 1
+    error_message = "The Run Command policy should have only the one statement."
+  }
+
+  assert {
+    condition = jsondecode(aws_iam_role_policy.releases.policy).Statement == [{
+      Effect   = "Allow"
+      Action   = "s3:GetObject"
+      Resource = "arn:aws:s3:::sunday-school-test-server-releases-123456789012/releases/*"
+    }]
+    error_message = "The releases policy should allow only reading releases from the release bucket."
+  }
+
+  assert {
     condition = jsondecode(aws_iam_role_policy.email.policy).Statement == [{
       Effect   = "Allow"
       Action   = "ses:SendEmail"
@@ -240,7 +268,82 @@ run "role" {
     error_message = "The role should have no managed policies."
   }
   assert {
-    condition     = toset(aws_iam_role_policies_exclusive.server.policy_names) == toset(["table", "session-manager", "email"])
-    error_message = "The role should have only the table, Session Manager and email policies."
+    condition     = toset(aws_iam_role_policies_exclusive.server.policy_names) == toset(["table", "session-manager", "run-command", "releases", "email"])
+    error_message = "The role should have only the table, Session Manager, Run Command, releases and email policies."
   }
+}
+
+run "releases" {
+  command = plan
+
+  assert {
+    condition     = aws_s3_bucket.releases.bucket == "sunday-school-test-server-releases-123456789012"
+    error_message = "The release bucket should be named after the server and the account."
+  }
+  assert {
+    condition     = output.release_bucket == aws_s3_bucket.releases.bucket && output.region == "us-east-1"
+    error_message = "deploy.sh needs the bucket and the region as outputs."
+  }
+  assert {
+    condition = alltrue([
+      aws_s3_bucket_public_access_block.releases.block_public_acls,
+      aws_s3_bucket_public_access_block.releases.block_public_policy,
+      aws_s3_bucket_public_access_block.releases.ignore_public_acls,
+      aws_s3_bucket_public_access_block.releases.restrict_public_buckets,
+    ])
+    error_message = "The release bucket should block all public access."
+  }
+  assert {
+    condition = (
+      aws_s3_bucket_lifecycle_configuration.releases.rule[0].filter[0].prefix == "releases/" &&
+      aws_s3_bucket_lifecycle_configuration.releases.rule[0].expiration[0].days == 30
+    )
+    error_message = "Releases should expire after 30 days."
+  }
+}
+
+run "api_env" {
+  command = plan
+
+  assert {
+    condition     = output.api_env == <<-EOT
+      AWS_REGION=us-east-1
+      COGNITO_CLIENT_ID=1example23456789abcdefghij
+      COGNITO_USER_POOL_ID=us-east-1_AbCdEf123
+      DYNAMODB_TABLE=sunday-school-test
+      NODE_ENV=production
+      PORT=3000
+    EOT
+    error_message = "The API's settings should be the table, pool and region from the variables, on port 3000 (the Caddyfile's)."
+  }
+}
+
+run "user_pool_in_other_region" {
+  command = plan
+
+  variables {
+    cognito_user_pool_id = "us-west-2_AbCdEf123"
+  }
+
+  expect_failures = [var.cognito_user_pool_id]
+}
+
+run "user_pool_id_malformed" {
+  command = plan
+
+  variables {
+    cognito_user_pool_id = "us-east-1_Ab Cd"
+  }
+
+  expect_failures = [var.cognito_user_pool_id]
+}
+
+run "client_id_malformed" {
+  command = plan
+
+  variables {
+    cognito_client_id = "COGNITO_CLIENT_ID=abc"
+  }
+
+  expect_failures = [var.cognito_client_id]
 }
