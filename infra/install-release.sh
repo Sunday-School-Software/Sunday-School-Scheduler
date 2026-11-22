@@ -64,10 +64,13 @@ if [[ -L $root/api ]]; then
   previous=$(dirname "$(readlink -f "$root/api")")
 fi
 
-# The server's first boot makes $root/web as an empty folder for Caddy. rmdir
-# fails rather than delete anything put there by hand.
+# The server's first boot makes $root/web as a folder for Caddy, and a UI may
+# have been copied into it by hand. The first deploy moves it aside rather
+# than delete it.
 if [[ -d $root/web && ! -L $root/web ]]; then
-  rmdir "$root/web"
+  rm -rf "$root/web.before-deploy"
+  mv -T "$root/web" "$root/web.before-deploy"
+  echo "Moved the UI that was there before deploys to $root/web.before-deploy"
 fi
 
 switch_to "$release"
