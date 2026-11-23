@@ -43,4 +43,5 @@ Hours logged as I work, starting 11/18/2026.
 | 11/20/2026 | Requested SES production access so the pilot can email real teachers, and confirmed AWS granted it | 0.25 |
 | 11/21/2026 | Set up SES in Terraform so the app can send email from its domain: verified the domain with DKIM records in Route 53, let the server's role send only from it, and wrote the setup steps, including leaving the SES sandbox; then reviewed the pull request piece by piece | 1 |
 | 11/21/2026 | Built the one-command deploy (#44): a script that builds the app, uploads it to S3 and installs it on the server through Systems Manager, a systemd service that restarts the API after a crash and starts it on boot, and rollback when the new version fails its health check; tested it in containers, had it reviewed and fixed what the review found; then created the production user pool, applied the Terraform and deployed it to the live server, fixing two bugs the first real deploy found | 1.5 |
-| **Total** | | **7.75** |
+| 11/22/2026 | Built the Email Service (#100): the API's one place that sends email, a plain-text message to every leader through SES from no-reply@ on the app's domain, with a timeout so a hung send can't stall a teacher's click; learned how SES, the SDK's retries and SES mocking work first, then had it reviewed and fixed what the review found | 1 |
+| **Total** | | **8.75** |
