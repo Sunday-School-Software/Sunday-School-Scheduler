@@ -631,7 +631,7 @@ What it does:
 
 systemd starts the API when the instance boots and starts it again 5 seconds after it crashes, so it comes back on its own. Caddy reads the UI from `/srv/sunday-school/web`, so the new UI is live as soon as the link moves. The instance keeps only the release that's running.
 
-The settings in `/etc/sunday-school/api.env` are `AWS_REGION`, `DYNAMODB_TABLE`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `PORT=3000` (the port the Caddyfile forwards to) and `NODE_ENV=production`. To change one, change `terraform.tfvars`, run `terraform apply`, and deploy again. There are no AWS keys: the API calls DynamoDB with the instance's role, and its Cognito calls (sign-in, sign-up, sign-out) don't need AWS credentials.
+The settings in `/etc/sunday-school/api.env` are `AWS_REGION`, `DYNAMODB_TABLE`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `EMAIL_FROM` (`no-reply@` and your `domain`), `PORT=3000` (the port the Caddyfile forwards to) and `NODE_ENV=production`. To change one, change `terraform.tfvars`, run `terraform apply`, and deploy again. There are no AWS keys: the API calls DynamoDB and SES with the instance's role, and its Cognito calls (sign-in, sign-up, sign-out) don't need AWS credentials.
 
 ### If a deploy fails
 
