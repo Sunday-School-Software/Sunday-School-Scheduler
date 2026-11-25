@@ -5,7 +5,7 @@
 | **Authors** | Hyrum Kammerman |
 | **Reviewers** | [who reviewed it — a teammate, the instructor, a design-review partner] |
 | **Status** | In review |
-| **Last updated** | 2026-11-21 |
+| **Last updated** | 2026-11-22 |
 | **Links** | [Proposal](https://docs.google.com/document/d/19jYz_kN3rfb-afqCQExlSvgMchcfi33fQDmuWVzpjow/edit?usp=sharing) · [Repository](https://github.com/Sunday-School-Software/Sunday-School-Scheduler) · [Issue tracker](https://github.com/Sunday-School-Software/Sunday-School-Scheduler/issues) |
 
 ## Revision history
@@ -28,6 +28,7 @@ Details for each revision are in the commit messages (`git log docs/design.md`).
 | 2026-11-18 | Hyrum Kammerman | §4: Terraform creates the server, and shell access goes through Session Manager instead of SSH |
 | 2026-11-20 | Hyrum Kammerman | §4: Terraform also creates the domain's DNS record and installs Caddy |
 | 2026-11-21 | Hyrum Kammerman | §4: Terraform also verifies the domain in SES, and the role can send email only from it |
+| 2026-11-22 | Hyrum Kammerman | §4: the Email Service's `email()` takes a subject |
 
 ---
 
@@ -97,7 +98,7 @@ The UI runs in the browser. Everything else is one Node (TypeScript) process on 
 | Auth Service | Signs users up and in through Cognito and verifies JWTs | Cognito | `register()`, `verifyEmail()`, `resendCode()`, `login()`, `logout()` → JWT; `verify(jwt)` → user_id; `profile(jwt)` → email and name |
 | User Service | Creates people, links and finds accounts and roles, and stores how each person wants to be notified | DB | `create(name, email?)`, `linkAccount(user_id, email, name)`, `findByUserId(user_id)` → Person, `listLeaders()` → leaders' contact details; Milestone 3: `setNotifyBy(person, channel, phone?)` |
 | Class Service | Classes, assignments and responses | DB | `createClass()`, `assign(class, person)`, `reassign(class, from, to)`, `listAssignments(person_id, dates)`, `listSchedule(dates)`, `update(class, person, status)` |
-| Email Service | Sends notification emails. | SES | `email(addresses, message)` → OK/error |
+| Email Service | Sends notification emails. | SES | `email(addresses, subject, message)` → OK/error |
 | SMS Service (Milestone 3) | Sends notification texts from the app's toll-free number. | End User Messaging | `text(phoneNumbers, message)` → OK/error |
 
 **Inside the UI.** The UI follows the Model-View-Presenter pattern. React components hold only view logic, presenters call the API through services and tell the components what to show, and one `ServerFacade` makes every API call. The [setup guide](setup.md#how-the-ui-is-organized) describes the folders.
@@ -126,7 +127,7 @@ flowchart LR
     api -->|"register(), login(), logout() → JWT<br/>verify(jwt) → user_id"| auth
     api -->|"create(), linkAccount(), findByUserId(),<br/>listLeaders() → Person, role, emails"| user
     api -->|"createClass(), assign(), reassign(),<br/>listAssignments(), listSchedule(),<br/>update() → result or error"| cls
-    api -->|"email(addresses, message) → error/OK"| email
+    api -->|"email(addresses, subject, message) → error/OK"| email
     auth -->|"auth requests, signing keys → tokens"| cognito
     user -->|"item reads and writes → JSON"| db
     cls -->|"queries, conditional writes → JSON"| db
@@ -151,7 +152,7 @@ One EC2 instance, in the same AWS account as Cognito, DynamoDB and SES, runs Cad
 3. API → Class Service `listAssignments(person_id, next 4 Sundays)`. The UI renders the dashboard.
 4. The teacher clicks **Confirm**. UI → API `PUT /assignments/{class}`. The API identifies the caller again and checks that the assignment is theirs (or that they're a leader).
 5. API → Class Service `update(class, person, status)`, a conditional write that returns OK.
-6. API → User Service `listLeaders()`, then Email Service `email(addresses, message)` through SES. From Milestone 3, leaders who chose text get `text(phoneNumbers, message)` from the SMS Service instead.
+6. API → User Service `listLeaders()`, then Email Service `email(addresses, subject, message)` through SES. From Milestone 3, leaders who chose text get `text(phoneNumbers, message)` from the SMS Service instead.
 7. The API returns success and the UI shows a success message. If SES (or, from Milestone 3, End User Messaging) fails after the save, the API still returns 200 and the UI warns that the presidency wasn't notified.
 
 A substitute request is the same flow with a different `status`.
@@ -201,7 +202,7 @@ sequenceDiagram
         User->>+DB: query leaders
         DB-->>-User: leaders
         User-->>-API: leaders' emails
-        API->>+Email: email(addresses, message)
+        API->>+Email: email(addresses, subject, message)
         Email->>+SES: send email to the presidency
         alt email sent
             SES-->>-Email: OK

@@ -311,10 +311,11 @@ run "api_env" {
       COGNITO_CLIENT_ID=1example23456789abcdefghij
       COGNITO_USER_POOL_ID=us-east-1_AbCdEf123
       DYNAMODB_TABLE=sunday-school-test
+      EMAIL_FROM=no-reply@scheduler.example.org
       NODE_ENV=production
       PORT=3000
     EOT
-    error_message = "The API's settings should be the table, pool and region from the variables, on port 3000 (the Caddyfile's)."
+    error_message = "The API's settings should be the table, pool and region from the variables, on port 3000 (the Caddyfile's), sending email from the domain."
   }
 }
 

@@ -60,5 +60,6 @@ locals {
     DYNAMODB_TABLE       = var.table_name
     COGNITO_USER_POOL_ID = var.cognito_user_pool_id
     COGNITO_CLIENT_ID    = var.cognito_client_id
+    EMAIL_FROM           = "no-reply@${var.domain}"
   }
 }
